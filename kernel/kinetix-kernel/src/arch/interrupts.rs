@@ -190,7 +190,7 @@ pub extern "sysv64" fn interrupt_dispatch(frame: &mut TrapFrame) {
     }
 }
 
-fn handle_exception(frame: &TrapFrame) {
+fn handle_exception(frame: &mut TrapFrame) {
     let vec = frame.vector as usize;
     let name = if vec < EXCEPTION_NAMES.len() {
         EXCEPTION_NAMES[vec]
@@ -198,10 +198,24 @@ fn handle_exception(frame: &TrapFrame) {
         "Unknown Exception"
     };
 
-    // Vector 3 (#BP): Software breakpoint — log and resume execution
+    // Vector 3 (#BP): Software breakpoint — check for user mode breakpoint first
     if frame.vector == 3 {
+        if (frame.cs & 3) == 3 {
+            if crate::user::handle_user_breakpoint(frame) {
+                return;
+            }
+        }
         println!("  [EXCEPTION #BP] Breakpoint caught at RIP: 0x{:X}", frame.rip);
         return;
+    }
+
+    // Vector 13 (#GP): General Protection Fault — check for user mode privilege violation
+    if frame.vector == 13 {
+        if (frame.cs & 3) == 3 {
+            if crate::user::handle_user_gp_fault(frame) {
+                return;
+            }
+        }
     }
 
     // Vector 14 (#PF): Page Fault — inspect CR2

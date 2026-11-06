@@ -10,15 +10,14 @@ mod loader;
 mod memory;
 mod research;
 mod task;
+mod user;
 
 use core::panic::PanicInfo;
 use kinetix_boot_protocol::BootInfo;
 
-/// Initial dedicated 64 KiB kernel stack.
-#[allow(dead_code)]
+/// Initial dedicated 64 KiB kernel stack located in identity-mapped BSS (PDPT[0]).
 #[repr(align(16))]
 struct KernelStack([u8; 64 * 1024]);
-#[allow(dead_code)]
 static KERNEL_STACK: KernelStack = KernelStack([0; 64 * 1024]);
 
 /// The definitive 64-bit Kinetix Kernel Entry Point.
@@ -29,6 +28,25 @@ static KERNEL_STACK: KernelStack = KernelStack([0; 64 * 1024]);
 #[no_mangle]
 #[link_section = ".text._start"]
 pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
+    let stack_top = {
+        let ptr = (&raw const KERNEL_STACK.0) as *const u8 as u64;
+        ptr + (64 * 1024)
+    };
+
+    let entry_fn = kernel_main as *const () as usize;
+    unsafe {
+        core::arch::asm!(
+            "mov rsp, {top}",
+            "call {entry}",
+            top = in(reg) stack_top,
+            entry = in(reg) entry_fn,
+            in("rdi") boot_info,
+            options(noreturn)
+        );
+    }
+}
+
+extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // 1. Initialize Serial Diagnostics (COM1: 0x3F8)
     arch::serial::SERIAL1.lock().init();
 
@@ -125,11 +143,14 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
 
         // 13. Execute CPU Multitasking Academic Research Benchmarks (Phase 12)
         research::run_research_experiments();
+
+        // 14. Execute User Mode (Ring 3 Privilege Separation) Verification Tests (Phase 15)
+        user::run_user_mode_tests();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 14 Milestone achieved: Native Application Loader (User ELF64 Relocation) operational.");
+    println!("[KERNEL] Phase 15 Milestone achieved: User Mode (Ring 3 Privilege Separation) operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();

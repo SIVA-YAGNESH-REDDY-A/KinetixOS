@@ -10,7 +10,14 @@ use spin::Mutex;
 
 pub const KERNEL_CODE_SELECTOR: u16 = 0x08;
 pub const KERNEL_DATA_SELECTOR: u16 = 0x10;
-pub const TSS_SELECTOR: u16 = 0x18;
+pub const USER_DATA_SELECTOR: u16 = 0x18;
+pub const USER_CODE_SELECTOR: u16 = 0x20;
+pub const TSS_SELECTOR: u16 = 0x28;
+
+#[allow(dead_code)]
+pub const USER_DATA_RPL3: u16 = USER_DATA_SELECTOR | 3; // 0x1B
+#[allow(dead_code)]
+pub const USER_CODE_RPL3: u16 = USER_CODE_SELECTOR | 3; // 0x23
 
 pub const DOUBLE_FAULT_IST_INDEX: u8 = 1;
 
@@ -18,6 +25,12 @@ pub const DOUBLE_FAULT_IST_INDEX: u8 = 1;
 #[repr(align(16))]
 struct InterruptStack([u8; 16384]);
 static mut DOUBLE_FAULT_STACK: InterruptStack = InterruptStack([0; 16384]);
+
+/// Dedicated 16 KiB kernel stack used by the CPU when an interrupt or exception
+/// occurs while executing in User Mode (Ring 3).
+#[repr(align(16))]
+struct KernelRsp0Stack([u8; 16384]);
+static mut KERNEL_RSP0_STACK: KernelRsp0Stack = KernelRsp0Stack([0; 16384]);
 
 /// Standard x86_64 Task State Segment.
 #[repr(C, packed)]
@@ -52,10 +65,10 @@ struct GdtPointer {
     base: u64,
 }
 
-/// Fixed-size GDT containing: Null, Kernel Code, Kernel Data, and 16-byte TSS.
+/// Fixed-size GDT containing: Null, Kernel Code, Kernel Data, User Data, User Code, and 16-byte TSS.
 #[repr(C, align(16))]
 struct GlobalDescriptorTable {
-    entries: [u64; 5],
+    entries: [u64; 7],
 }
 
 impl GlobalDescriptorTable {
@@ -65,8 +78,10 @@ impl GlobalDescriptorTable {
                 0,                          // 0x00: Null
                 0x0020_9A00_0000_0000,      // 0x08: Kernel Code 64-bit (Present, Ring 0, Executable, Readable, L=1)
                 0x0000_9200_0000_0000,      // 0x10: Kernel Data 64-bit (Present, Ring 0, Writable)
-                0,                          // 0x18: TSS Low 8 bytes
-                0,                          // 0x20: TSS High 8 bytes
+                0x0000_F200_0000_0000,      // 0x18: User Data 64-bit (Present, Ring 3, Writable)
+                0x0020_FA00_0000_0000,      // 0x20: User Code 64-bit (Present, Ring 3, Executable, Readable, L=1)
+                0,                          // 0x28: TSS Low 8 bytes
+                0,                          // 0x30: TSS High 8 bytes
             ],
         }
     }
@@ -84,8 +99,8 @@ impl GlobalDescriptorTable {
 
         let high = ptr >> 32;
 
-        self.entries[3] = low;
-        self.entries[4] = high;
+        self.entries[5] = low;
+        self.entries[6] = high;
     }
 }
 
@@ -94,14 +109,20 @@ static GDT: Mutex<GlobalDescriptorTable> = Mutex::new(GlobalDescriptorTable::new
 
 /// Initializes and loads the Kernel GDT and Task State Segment.
 pub fn init() {
-    // 1. Configure TSS with dedicated Double Fault IST stack
-    let stack_top = unsafe {
+    // 1. Configure TSS with dedicated Double Fault IST stack and Ring 3 -> Ring 0 RSP0 stack
+    let df_stack_top = unsafe {
         let ptr = (&raw const DOUBLE_FAULT_STACK.0) as *const u8 as u64;
         ptr + 16384
     };
 
+    let rsp0_stack_top = unsafe {
+        let ptr = (&raw const KERNEL_RSP0_STACK.0) as *const u8 as u64;
+        ptr + 16384
+    };
+
     unsafe {
-        (*(&raw mut TSS)).interrupt_stack_table[(DOUBLE_FAULT_IST_INDEX - 1) as usize] = stack_top;
+        (*(&raw mut TSS)).interrupt_stack_table[(DOUBLE_FAULT_IST_INDEX - 1) as usize] = df_stack_top;
+        (*(&raw mut TSS)).privilege_stack_table[0] = rsp0_stack_top;
     }
 
     // 2. Insert TSS into GDT
@@ -148,5 +169,21 @@ pub fn init() {
     // 6. Load Task State Segment register via `ltr`
     unsafe {
         asm!("ltr {sel:x}", sel = in(reg) TSS_SELECTOR, options(nostack, preserves_flags));
+    }
+}
+
+/// Updates the Kernel Privilege Stack Pointer (RSP0) in the TSS.
+#[allow(dead_code)]
+pub fn set_kernel_stack(stack_top: u64) {
+    unsafe {
+        (*(&raw mut TSS)).privilege_stack_table[0] = stack_top;
+    }
+}
+
+/// Returns the current RSP0 configured in the TSS.
+#[allow(dead_code)]
+pub fn get_kernel_stack() -> u64 {
+    unsafe {
+        (*(&raw const TSS)).privilege_stack_table[0]
     }
 }

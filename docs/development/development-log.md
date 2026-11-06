@@ -202,3 +202,20 @@ This document tracks chronological engineering milestones, architectural choices
   - 11 physical frames tracked and 100% reclaimed on drop.
   - Rejection of invalid/corrupted binaries verified.
   - Status: `Phase 14 Milestone achieved: Native Application Loader (User ELF64 Relocation) operational.`
+
+## Phase 15: User Mode (Ring 3 Privilege Separation) — 2026-11-06
+- **Objective**: Implement hardware-enforced CPU privilege level separation (Ring 0 Kernel vs. Ring 3 User), GDT user segment descriptors, Task State Segment (TSS) RSP0 privilege stack switching, synthetic `iretq` frame transition, hardware privilege fault enforcement (`#GP` on privileged instructions), software breakpoint trap gates (`#BP` with IDT DPL = 3), and clean kernel context unwinding.
+- **Architectural Implementation**:
+  - `arch/gdt.rs`: Configured User Data Selector (`0x18`, RPL 3: `0x1B`), User Code Selector (`0x20`, RPL 3: `0x23`), TSS (`0x28`), and dedicated 16 KiB `KERNEL_RSP0_STACK` for hardware privilege transitions.
+  - `arch/idt.rs`: Implemented `IdtEntry::set_dpl(dpl)` and configured Vector 3 (`#BP`) with DPL = 3 (`type_attr = 0xEE`) allowing user-mode execution of `int3`.
+  - `user/ring3.rs`: Created assembly routines `run_user_mode_probe` (saving callee-saved registers, pushing `iretq` frame, setting user data segments, loading user CR3, dropping to Ring 3 via `iretq`) and `return_from_user_mode_probe` (restoring kernel CR3, kernel segment registers, original kernel RSP, restoring registers, returning status 1).
+  - `user/mod.rs`: Test coordinator and exception hooks (`handle_user_breakpoint`, `handle_user_gp_fault`), executing user payload testing CS RPL, `cli` instruction blocking, and breakpoint resumption.
+  - `loader/process.rs`: Enhanced page directory cloning to copy higher physical mappings (e.g. `PDPT[3]` for GOP framebuffer at `0xE000_0000`), allowing dual console telemetry without secondary page faults.
+  - `main.rs`: Switched kernel execution to dedicated 64 KiB `KERNEL_STACK` located in identity-mapped BSS (`PDPT[0]`).
+- **Empirical Verification (Oracle VirtualBox 7.2)**:
+  - GDT selectors and TSS RSP0 verified.
+  - User mode confirmed: CPL == 3 recorded via CS register read (`CS = 0x23`, `SS = 0x1B`).
+  - Hardware privilege barrier: privileged instruction `cli` blocked by CPU with General Protection Fault (`#GP`, Error Code 0x0).
+  - Resumption after `#GP`: `frame.rip += 1` advanced past faulting instruction and reached second breakpoint cleanly.
+  - Stack switching and clean kernel unwinding: returned safely to caller, dropped `ProcessAddressSpace`, and reclaimed all 10 physical frames.
+  - Status: `[KERNEL] Phase 15 Milestone achieved: User Mode (Ring 3 Privilege Separation) operational.`

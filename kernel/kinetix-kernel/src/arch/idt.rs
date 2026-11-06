@@ -44,6 +44,11 @@ impl IdtEntry {
         self.offset_high = ((handler_addr >> 32) & 0xFFFF_FFFF) as u32;
         self.zero = 0;
     }
+
+    /// Sets the Descriptor Privilege Level (DPL 0..3) for this gate.
+    pub fn set_dpl(&mut self, dpl: u8) {
+        self.type_attr = (self.type_attr & !0x60) | ((dpl & 0x03) << 5);
+    }
 }
 
 /// IDT pointer structure loaded by `lidt`.
@@ -96,6 +101,9 @@ pub fn init() {
         let ist = if vec == 8 { DOUBLE_FAULT_IST_INDEX } else { 0 };
         idt.entries[vec].set_handler(*isr as *const () as usize as u64, ist);
     }
+
+    // Vector 3 (#BP): Set DPL = 3 so user-mode code can invoke int3
+    idt.entries[3].set_dpl(3);
 
     // Configure Hardware IRQs
     idt.entries[32].set_handler(irq0 as *const () as usize as u64, 0); // IRQ 0: Timer

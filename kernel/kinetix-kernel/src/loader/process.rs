@@ -66,6 +66,13 @@ impl ProcessAddressSpace {
             let kernel_pdpt = unsafe { &*(kernel_pdpt_phys.as_ptr::<PageTable>()) };
             // Copy PDPT[0] so kernel code, heap, GDT, IDT, and stacks are present during interrupts
             pdpt.entries[0] = kernel_pdpt.entries[0];
+            // Copy higher physical identity mappings (e.g. PDPT[3] for GOP framebuffer at 0xE0000000)
+            // skipping entry 1 which is exclusively reserved for User Space (1 GiB .. 2 GiB)
+            for i in 2..512 {
+                if kernel_pdpt.entries[i].is_present() {
+                    pdpt.entries[i] = kernel_pdpt.entries[i];
+                }
+            }
         }
 
         // Copy any higher-level entries present in the boot PML4 (e.g. framebuffer)
