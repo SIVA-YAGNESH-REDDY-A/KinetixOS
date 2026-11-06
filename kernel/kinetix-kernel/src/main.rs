@@ -151,11 +151,14 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
         // 15. Execute System Call ABI (syscall / sysret) Verification Tests (Phase 16)
         syscall::run_syscall_tests();
+
+        // 16. Execute Native Demonstration Applications in Ring 3 (Phase 17)
+        loader::run_demonstration_apps();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 16 Milestone achieved: System Call ABI (syscall / sysret) operational.");
+    println!("[KERNEL] Phase 17 Milestone achieved: Native Demonstration Applications (hello-world, sysinfo, bench) operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();

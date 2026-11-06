@@ -150,7 +150,7 @@ pub fn run_loader_tests() {
 
     let string_slice = unsafe {
         let ptr = data_phys.as_ptr::<u8>();
-        core::slice::from_raw_parts(ptr, 41)
+        core::slice::from_raw_parts(ptr, 256)
     };
     let text = core::str::from_utf8(string_slice).unwrap_or("");
     assert!(text.contains("Hello from Kinetix OS"), "Data segment must contain expected string");
@@ -194,4 +194,46 @@ pub fn run_loader_tests() {
     println!("  [PASS] Corrupted binary rejected cleanly with ElfError.");
 
     println!("[TEST] All Native Application Loader Verification Tests PASSED!\n");
+}
+
+/// Executes all native user demonstration applications sequentially in isolated address spaces (Phase 17).
+pub fn run_demonstration_apps() {
+    println!("\n================================================================================");
+    println!("          KINETIX OS NATIVE DEMONSTRATION APPLICATIONS (PHASE 17)               ");
+    println!("================================================================================\n");
+
+    let apps = [
+        ("/bin/hello-world", "Hello World Native Application"),
+        ("/bin/sysinfo", "System Information Utility"),
+        ("/bin/bench", "User-Space Arithmetic Benchmark"),
+    ];
+
+    for (app_path, app_desc) in apps {
+        println!("--------------------------------------------------------------------------------");
+        println!("[APP LAUNCHER] Loading '{}' ({})...", app_path, app_desc);
+        let space = load_app_from_fs(app_path)
+            .unwrap_or_else(|e| panic!("Failed to load {}: {:?}", app_path, e));
+
+        let entry = space.entry_point.as_u64();
+        let user_rsp = space.user_stack_top.as_u64() - 16;
+        let pml4_phys = space.pml4_phys.as_u64();
+        let frame_count = space.allocated_frames.len();
+
+        println!("  Address Space: PML4 0x{:X}, Entry 0x{:X}, RSP 0x{:X} ({} frames)",
+            pml4_phys, entry, user_rsp, frame_count
+        );
+        println!("  Executing '{}' in Ring 3...\n", app_path);
+
+        let exit_code = unsafe {
+            crate::syscall::run_user_process(entry, user_rsp, pml4_phys)
+        };
+
+        println!("\n  [APP LAUNCHER] '{}' terminated with exit status {}.", app_path, exit_code);
+        assert_eq!(exit_code, 0, "Application must terminate with exit status 0");
+
+        drop(space);
+        println!("  [APP LAUNCHER] Reclaimed {} physical frames for '{}'.\n", frame_count, app_path);
+    }
+
+    println!("[TEST] All Native Demonstration Applications executed successfully (exit code 0)!\n");
 }

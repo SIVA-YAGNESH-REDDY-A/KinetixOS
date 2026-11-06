@@ -237,3 +237,19 @@ This document tracks chronological engineering milestones, architectural choices
   - `SYS_EXIT(42)` terminated user execution and returned exit code 42 to kernel caller.
   - All 10 user physical frames reclaimed on drop.
   - Status: `[KERNEL] Phase 16 Milestone achieved: System Call ABI (syscall / sysret) operational.`
+
+## Phase 17: Native Demonstration Applications — 2026-11-06
+- **Objective**: Design, package, execute, and verify native user applications running in unprivileged Ring 3 using `kinetix-runtime`, communicating exclusively through the hardware fast system call ABI (`syscall` / `sysretq`), and validating complete lifecycle isolation, compute benchmarks, and physical memory reclamation.
+- **Architectural Implementation**:
+  - `crates/kinetix-runtime`: Extended user runtime with low-level assembly stubs (`syscall0`, `syscall1`, `syscall2`), numeric formatters (`print_u64`, `print_i64`), and ergonomic API (`print_str`, `yield_now`, `getpid`, `uptime_ms`, `exit`).
+  - `apps/hello-world`: Refactored to pure runtime API, displaying greeting banner, PID 1, uptime in ms, and exiting cleanly with code 0.
+  - `apps/sysinfo`: Implemented system introspection utility that verifies CPL == 3 from user CS register, queries OS name, AMD64 target architecture, UEFI firmware, syscall ABI linkage, process identity, and boot uptime.
+  - `apps/bench`: Implemented user-space arithmetic prime-search benchmark (`2..3000`) with periodic cooperative `yield_now()` invocations every 500 iterations, mathematically verifying compiler register preservation across syscall boundaries.
+  - `kernel/syscall/entry.rs`: Fixed user register preservation bug in `syscall_entry` assembly stub: preserved all 15 general-purpose registers (including loop counter `RSI`) plus user stack alignment, ensuring user loops and register states remain pristine across kernel dispatch.
+  - `kernel/loader/mod.rs`: Implemented `run_demonstration_apps()`: sequentially loads `/bin/hello-world`, `/bin/sysinfo`, and `/bin/bench` from `bootfs.tar`, instantiates an isolated `ProcessAddressSpace` for each, drops into Ring 3, asserts exit status 0, and reclaims all 11 physical frames per app.
+  - `tools/kinetix-image-builder` & `scripts/windows/build-os.ps1`: Automated compilation and FAT32/USTAR staging for all three native applications.
+- **Empirical Verification (Oracle VirtualBox 7.2)**:
+  - `/bin/hello-world`: Loaded at entry `0x4000_0000`, printed greeting banner, PID 1, and uptime 710 ms via `SYS_PRINT`, `SYS_GETPID`, `SYS_UPTIME_MS`; terminated with exit status 0; 11 physical frames reclaimed.
+  - `/bin/sysinfo`: Loaded in clean address space, verified CPL == 3, displayed complete system profile, terminated with exit status 0; 11 physical frames reclaimed.
+  - `/bin/bench`: Executed trial division over 2,999 candidates with 6 cooperative yields, discovered 430 primes, confirmed prime sum checksum 593,823, terminated with exit status 0; 11 physical frames reclaimed.
+  - Status: `[KERNEL] Phase 17 Milestone achieved: Native Demonstration Applications (hello-world, sysinfo, bench) operational.`

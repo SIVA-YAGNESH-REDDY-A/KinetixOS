@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "bench"
+version = "0.1.0"
+dependencies = [
+ "kinetix-runtime",
+]
+
+[[package]]
 name = "bit_field"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -163,6 +170,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.1.0"
+dependencies = [
+ "kinetix-runtime",
 ]
 
 [[package]]

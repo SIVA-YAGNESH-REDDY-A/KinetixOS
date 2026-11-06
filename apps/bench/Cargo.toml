@@ -1,0 +1,10 @@
+[package]
+name = "bench"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "User-space mathematical benchmark application for Kinetix OS"
+
+[dependencies]
+kinetix-runtime = { path = "../../crates/kinetix-runtime" }

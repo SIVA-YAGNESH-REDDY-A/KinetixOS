@@ -9,11 +9,16 @@ Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "         BUILDING KINETIX OS              " -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
-# 1. Build Native Application
-Write-Host "Building Native App (hello-world)..." -ForegroundColor Cyan
+# 1. Build Native Applications
+Write-Host "Building Native Apps (hello-world, sysinfo, bench)..." -ForegroundColor Cyan
 cargo rustc -p hello-world --target x86_64-unknown-none --release -- -C link-arg=-Tapps/hello-world/app.ld
+cargo rustc -p sysinfo --target x86_64-unknown-none --release -- -C link-arg=-Tapps/hello-world/app.ld
+cargo rustc -p bench --target x86_64-unknown-none --release -- -C link-arg=-Tapps/hello-world/app.ld
+
 if (Test-Path "artifacts\ramdisk\bin") {
     Copy-Item -Force "target\x86_64-unknown-none\release\hello-world" "artifacts\ramdisk\bin\hello-world"
+    Copy-Item -Force "target\x86_64-unknown-none\release\sysinfo" "artifacts\ramdisk\bin\sysinfo"
+    Copy-Item -Force "target\x86_64-unknown-none\release\bench" "artifacts\ramdisk\bin\bench"
 }
 
 # 2. Build Bootloader

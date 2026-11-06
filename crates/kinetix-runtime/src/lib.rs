@@ -69,6 +69,34 @@ pub fn print_str(s: &str) {
     }
 }
 
+/// Prints a 64-bit unsigned integer to the Kinetix OS console.
+pub fn print_u64(mut n: u64) {
+    if n == 0 {
+        print_str("0");
+        return;
+    }
+    let mut buf = [0u8; 20];
+    let mut i = buf.len();
+    while n > 0 {
+        i -= 1;
+        buf[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+    }
+    if let Ok(s) = core::str::from_utf8(&buf[i..]) {
+        print_str(s);
+    }
+}
+
+/// Prints a 64-bit signed integer to the Kinetix OS console.
+pub fn print_i64(n: i64) {
+    if n < 0 {
+        print_str("-");
+        print_u64(n.unsigned_abs());
+    } else {
+        print_u64(n as u64);
+    }
+}
+
 /// Voluntarily yields the CPU time-slice to the scheduler.
 pub fn yield_now() {
     unsafe {

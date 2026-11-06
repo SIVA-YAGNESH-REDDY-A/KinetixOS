@@ -53,7 +53,7 @@ syscall_entry:
     // 2. Switch to dedicated kernel syscall stack
     mov rsp, [rip + KERNEL_SYSCALL_RSP]
 
-    // 3. Preserve user context on kernel syscall stack
+    // 3. Preserve complete user context on kernel syscall stack (16 quadwords = 128 bytes, 16-byte aligned)
     push [rip + USER_SAVED_RSP] // User RSP
     push r11                    // User RFLAGS (saved by hardware in R11)
     push rcx                    // User RIP (saved by hardware in RCX)
@@ -63,8 +63,15 @@ syscall_entry:
     push r13
     push r14
     push r15
+    push rdi                    // User Arg 1
+    push rsi                    // User Arg 2
+    push rdx                    // User Arg 3
+    push r10                    // User Arg 4
+    push r8                     // User Arg 5
+    push r9                     // User Arg 6
+    push rax                    // Alignment dummy (16 quadwords = 128 bytes)
 
-    // 4. Reload kernel data segments (0x10) using rcx (already pushed to stack)
+    // 4. Reload kernel data segments (0x10) using cx (already pushed to stack)
     mov cx, 0x10
     mov ds, cx
     mov es, cx
@@ -83,14 +90,21 @@ syscall_entry:
     cld
     call syscall_dispatch
 
-    // Return value from syscall_dispatch is in RAX
+    // Return value from syscall_dispatch is in RAX (preserved)
 
-    // 6. Reload user data segments (0x18 | 3 = 0x1B) using cx before restoring rcx
+    // 6. Reload user data segments (0x18 | 3 = 0x1B) using cx before restoring registers
     mov cx, 0x1B
     mov ds, cx
     mov es, cx
 
-    // 7. Restore registers
+    // 7. Restore all user registers exactly
+    add rsp, 8         // Discard alignment dummy
+    pop r9
+    pop r8
+    pop r10
+    pop rdx
+    pop rsi
+    pop rdi
     pop r15
     pop r14
     pop r13

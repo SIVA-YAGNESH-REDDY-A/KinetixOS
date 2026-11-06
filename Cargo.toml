@@ -7,6 +7,8 @@ members = [
     "crates/kinetix-runtime",
     "tools/kinetix-image-builder",
     "apps/hello-world",
+    "apps/sysinfo",
+    "apps/bench",
 ]
 
 [workspace.package]

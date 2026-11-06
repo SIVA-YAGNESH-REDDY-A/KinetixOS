@@ -128,6 +128,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut elf_file = apps_dir.create_file("HELLO-WORLD.ELF")?;
                 elf_file.write_all(&abytes)?;
             }
+
+            // Also stage other apps if present in release directory
+            let sysinfo_path = "target/x86_64-unknown-none/release/sysinfo";
+            if Path::new(sysinfo_path).exists() {
+                println!("[IMAGE BUILDER] Writing /KINETIX/APPS/SYSINFO.ELF from {}", sysinfo_path);
+                let mut sfile = apps_dir.create_file("SYSINFO.ELF")?;
+                sfile.write_all(&fs::read(sysinfo_path)?)?;
+            }
+            let bench_path = "target/x86_64-unknown-none/release/bench";
+            if Path::new(bench_path).exists() {
+                println!("[IMAGE BUILDER] Writing /KINETIX/APPS/BENCH.ELF from {}", bench_path);
+                let mut bfile = apps_dir.create_file("BENCH.ELF")?;
+                bfile.write_all(&fs::read(bench_path)?)?;
+            }
         }
     }
 
