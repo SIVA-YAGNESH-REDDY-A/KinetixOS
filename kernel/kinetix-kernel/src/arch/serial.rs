@@ -64,21 +64,3 @@ impl Write for SerialPort {
 }
 
 pub static SERIAL1: Mutex<SerialPort> = Mutex::new(SerialPort::new(COM1_PORT));
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => {
-        $crate::arch::serial::_print(format_args!($($arg)*));
-    };
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-pub fn _print(args: fmt::Arguments) {
-    let mut serial = SERIAL1.lock();
-    let _ = serial.write_fmt(args);
-}

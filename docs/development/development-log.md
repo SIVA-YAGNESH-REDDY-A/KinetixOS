@@ -97,3 +97,18 @@ This document tracks chronological engineering milestones, architectural choices
   - Software breakpoint (`#BP`) caught at RIP `0x20304A` and execution safely resumed.
   - Hardware timer interrupts active: delivered 10 ticks (100 ms) via IRQ 0.
   - Status: `Phase 8 Milestone achieved: CPU Interrupts & Exception Infrastructure operational.`
+
+---
+
+### [2026-11-06] — Phase 9: Hardware Interaction Layer (Graphical Console & PS/2 Keyboard)
+* **Action**: Designed and implemented the hardware interaction and console output layer:
+  1. `font.rs` (`kernel/kinetix-kernel/src/console/font.rs`): Complete 8x16 monospace font table embedded in kernel `.rodata` covering ASCII 32 (`' '`) to 126 (`'~'`).
+  2. `console/mod.rs` (`kernel/kinetix-kernel/src/console/mod.rs`): Direct linear framebuffer text console supporting 1024x768 @ 32 bpp resolution (128 columns $\times$ 48 rows text grid), automatic line wrapping, backspace (`\x08`), tab expansion (`\t`), and hardware-accelerated memory-move vertical row scrolling.
+  3. Dual Console Dispatcher: Integrated `print!` and `println!` macros to simultaneously broadcast all kernel logging to COM1 serial (0x3F8) and the on-screen graphical display.
+  4. `keyboard.rs` (`kernel/kinetix-kernel/src/arch/keyboard.rs`): PS/2 Keyboard Controller driver decoding Scancode Set 1 make/break codes, tracking Shift, Caps Lock, Ctrl, Alt states, and buffering typed keys in a thread-safe 256-entry circular ring buffer (`KEYBOARD_BUFFER`).
+* **Action**: Updated `scripts/windows/run-virtualbox.ps1` to prevent PowerShell `$ErrorActionPreference` aborting on external tool informational messages.
+* **Milestone**: **PHASE 9 COMPLETED & VERIFIED IN VIRTUALBOX**. Serial log verified:
+  - Console display active at 1024x768 (128 cols $\times$ 48 rows).
+  - 8x16 Monospace Font rendering verified.
+  - PS/2 Keyboard Set 1 scancode decoder verified (letters, shift modifiers, enter, backspace).
+  - Status: `Phase 9 Milestone achieved: Hardware Interaction Layer operational.`

@@ -28,6 +28,11 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
     // 1. Initialize Serial Diagnostics (COM1: 0x3F8)
     arch::serial::SERIAL1.lock().init();
 
+    // 2. Initialize Graphical Framebuffer Console early if present
+    if boot_info.is_valid() && boot_info.framebuffer.physical_address != 0 {
+        console::FRAMEBUFFER_CONSOLE.lock().init(boot_info.framebuffer);
+    }
+
     println!("================================================");
     println!("                 KINETIX OS                     ");
     println!("================================================");
@@ -35,14 +40,14 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
     println!("Kinetix Kernel Initialized");
     println!();
     println!("Architecture : x86_64");
-    println!("Language     : Rust (core + no_std)");
+    println!("Language     : Rust (core + alloc + no_std)");
     println!("Boot Mode    : UEFI (64-bit)");
     println!();
     println!("Kernel Status: RUNNING");
     println!();
     println!("================================================");
 
-    // 2. Validate Boot Information Protocol
+    // 3. Validate Boot Information Protocol
     if boot_info.is_valid() {
         println!("[KERNEL] BootInfo verification PASSED (Magic: 0x{:X})", boot_info.magic);
         println!(
@@ -63,7 +68,7 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
             usable_ram_bytes
         );
 
-        // 3. Initialize Linear Framebuffer if provided
+        // Framebuffer diagnostics
         if boot_info.framebuffer.physical_address != 0 {
             println!(
                 "[KERNEL] Framebuffer detected at 0x{:X} ({}x{}, stride: {})",
@@ -72,7 +77,6 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
                 boot_info.framebuffer.height,
                 boot_info.framebuffer.stride
             );
-            console::FRAMEBUFFER_CONSOLE.lock().init(boot_info.framebuffer);
         } else {
             println!("[KERNEL] No framebuffer provided; serial console only.");
         }
@@ -99,11 +103,15 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
 
         // 8. Execute Exception & Hardware Interrupt Verification Self-Tests
         arch::run_interrupt_tests();
+
+        // 9. Execute Hardware Interaction Verification Self-Tests (Phase 9)
+        console::run_console_tests();
+        arch::keyboard::run_keyboard_tests();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 8 Milestone achieved: CPU Interrupts & Exception Infrastructure operational.");
+    println!("[KERNEL] Phase 9 Milestone achieved: Hardware Interaction Layer operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();

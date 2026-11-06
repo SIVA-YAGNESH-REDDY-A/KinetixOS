@@ -246,7 +246,7 @@ fn handle_irq(frame: &TrapFrame) {
         1 => {
             // IRQ 1: PS/2 Keyboard
             let scancode = unsafe { inb(0x60) };
-            let _ = scancode; // Stored for keyboard driver in Phase 9
+            super::keyboard::on_interrupt(scancode);
             unsafe {
                 PICS.lock().notify_end_of_interrupt(frame.vector as u8);
             }

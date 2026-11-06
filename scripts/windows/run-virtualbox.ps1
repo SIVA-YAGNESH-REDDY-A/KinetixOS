@@ -27,18 +27,18 @@ if (!(Test-Path $imgFile)) {
 }
 
 # Stop VM if running
-$vmInfo = (& $vboxManage showvminfo $vmName --machinereadable 2>$null | Out-String)
+$vmInfo = (cmd /c "`"$vboxManage`" showvminfo $vmName --machinereadable 2>nul") -join "`n"
 if ($vmInfo -match 'VMState="running"') {
     Write-Host "Stopping running VM..." -ForegroundColor Yellow
-    & $vboxManage controlvm $vmName poweroff 2>$null
+    cmd /c "`"$vboxManage`" controlvm $vmName poweroff >nul 2>&1"
     Start-Sleep -Seconds 2
 }
 
 # 1. Close medium if already registered, then convert raw image to VDI
-$mediumList = & $vboxManage list hdds
+$mediumList = (cmd /c "`"$vboxManage`" list hdds 2>nul") -join "`n"
 if ($mediumList -match [regex]::Escape($vdiFile)) {
-    & $vboxManage storageattach $vmName --storagectl "SATA" --port 0 --device 0 --type hdd --medium none 2>$null
-    & $vboxManage closemedium disk $vdiFile 2>$null
+    cmd /c "`"$vboxManage`" storageattach $vmName --storagectl SATA --port 0 --device 0 --type hdd --medium none >nul 2>&1"
+    cmd /c "`"$vboxManage`" closemedium disk `"$vdiFile`" >nul 2>&1"
 }
 
 if (Test-Path $vdiFile) {
