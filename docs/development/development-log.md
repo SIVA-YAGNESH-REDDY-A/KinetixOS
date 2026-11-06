@@ -112,3 +112,17 @@ This document tracks chronological engineering milestones, architectural choices
   - 8x16 Monospace Font rendering verified.
   - PS/2 Keyboard Set 1 scancode decoder verified (letters, shift modifiers, enter, backspace).
   - Status: `Phase 9 Milestone achieved: Hardware Interaction Layer operational.`
+
+---
+
+### [2026-11-06] — Phase 10: Cooperative Task Management & CPU Context Switching
+* **Action**: Designed and implemented cooperative multitasking and low-level context switching foundation:
+  1. `tcb.rs` (`kernel/kinetix-kernel/src/task/tcb.rs`): Task Control Block (`Task`), unique `TaskId`, lifecycle states (`Ready`, `Running`, `Blocked`, `Terminated`), and dedicated 64 KiB kernel stack allocation. Initialized synthetic stack frame with 16-byte alignment to seamlessly transition into `task_trampoline`.
+  2. `context.rs` (`kernel/kinetix-kernel/src/task/context.rs`): Low-level assembly context switch (`switch_context`) saving/restoring callee-saved registers (`RBX`, `RBP`, `R12..R15`), swapping hardware stack pointer (`RSP`), and jumping via `ret`. Implemented `task_trampoline` wrapper to invoke task entry functions and automatically trigger `task::exit()` upon completion.
+  3. `task/mod.rs` (`kernel/kinetix-kernel/src/task/mod.rs`): Global `TASK_MANAGER` managing task queue, boot thread registration (Task 0 "Kernel Main"), task spawning (`task::spawn`), voluntary CPU yielding (`yield_now`), and graceful termination (`exit`).
+* **Action**: Implemented in-kernel verification test spawning Task 1 ("Task Alpha") and Task 2 ("Task Beta") interleaving execution in lockstep through `yield_now()`.
+* **Milestone**: **PHASE 10 COMPLETED & VERIFIED IN VIRTUALBOX**. Serial log verified:
+  - Task 0 ("Kernel Main") registered as active running thread.
+  - Task 1 ("Task Alpha") and Task 2 ("Task Beta") spawned.
+  - Interleaved execution: Alpha 1 -> Beta 1 -> Alpha 2 -> Beta 2 -> Alpha 3 -> Beta 3.
+  - Status: `Phase 10 Milestone achieved: Cooperative Task Management & Context Switching operational.`

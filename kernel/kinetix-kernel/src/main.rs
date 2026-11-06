@@ -6,6 +6,7 @@ extern crate alloc;
 mod arch;
 mod console;
 mod memory;
+mod task;
 
 use core::panic::PanicInfo;
 use kinetix_boot_protocol::BootInfo;
@@ -107,11 +108,15 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
         // 9. Execute Hardware Interaction Verification Self-Tests (Phase 9)
         console::run_console_tests();
         arch::keyboard::run_keyboard_tests();
+
+        // 10. Initialize Cooperative Task Management & CPU Context Switching (Phase 10)
+        task::init();
+        task::run_task_tests();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 9 Milestone achieved: Hardware Interaction Layer operational.");
+    println!("[KERNEL] Phase 10 Milestone achieved: Cooperative Task Management & Context Switching operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();
