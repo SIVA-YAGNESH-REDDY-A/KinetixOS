@@ -49,10 +49,16 @@ This document tracks chronological engineering milestones, architectural choices
 
 ---
 
-### [2026-11-06] — Phase 5: Bootloader-to-Kernel Integration
+### [2026-11-06] — Phase 5 & 6: Bootloader-to-Kernel Integration & VirtualBox First Boot
 * **Action**: Implemented ELF64 parser and loader in `kinetix-bootloader` (`loader.rs`).
-* **Action**: Implemented file reading via UEFI `SimpleFileSystem` protocol to load `/KINETIX/KERNEL/KINETIX-KERNEL.ELF`.
-* **Action**: Allocated physical pages and mapped `PT_LOAD` segments into memory.
-* **Action**: Initialized GOP framebuffer and recorded metadata into `BootInfo`.
-* **Action**: Implemented clean handoff via `ExitBootServices`, mapped the UEFI memory map into Kinetix memory regions, and transferred execution control to `kernel_entry(&BOOT_INFO)`.
-* **Action**: Implemented end-to-end OS build pipeline (`scripts/windows/build-os.ps1` and `build-image.ps1`).
+* **Action**: Implemented file reading via UEFI `SimpleFileSystem` protocol to load `/KERNEL.ELF` and `/KINETIX/KERNEL/KINETIX-KERNEL.ELF`.
+* **Action**: Allocated physical pages and mapped `PT_LOAD` segments into memory at `0x0020_0000`.
+* **Action**: Initialized GOP framebuffer (1024x768, 32-bpp BGR) and recorded metadata into `BootInfo`.
+* **Action**: Resolved ABI calling convention boundary between UEFI MS x64 and Kernel System V AMD64 using `extern "sysv64"` on Rust stable.
+* **Action**: Successfully performed `ExitBootServices()`, converted UEFI memory map entries (111 regions, 2004 MiB usable RAM) into `BootInfo`.
+* **Action**: Launched Oracle VirtualBox 7.2.22 with 64-bit UEFI firmware and COM1 serial redirection.
+* **Milestone**: **MILESTONE A ACHIEVED — KINETIX OS FIRST BOOT IN VIRTUALBOX!** Verified via live serial logs:
+  - Magic signature `0x4B494E4554495821` verified.
+  - Usable physical memory: 2004 MiB.
+  - Linear framebuffer: `0x80000000` (1024x768).
+  - Kernel Status: **RUNNING**.
