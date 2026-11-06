@@ -26,6 +26,14 @@ if (!(Test-Path $imgFile)) {
     exit 1
 }
 
+# Stop VM if running
+$vmInfo = (& $vboxManage showvminfo $vmName --machinereadable 2>$null | Out-String)
+if ($vmInfo -match 'VMState="running"') {
+    Write-Host "Stopping running VM..." -ForegroundColor Yellow
+    & $vboxManage controlvm $vmName poweroff 2>$null
+    Start-Sleep -Seconds 2
+}
+
 # 1. Close medium if already registered, then convert raw image to VDI
 $mediumList = & $vboxManage list hdds
 if ($mediumList -match [regex]::Escape($vdiFile)) {
@@ -46,7 +54,7 @@ if ($vmList -notmatch "`"$vmName`"") {
     & $vboxManage createvm --name $vmName --ostype "Other_64" --register
     & $vboxManage modifyvm $vmName --firmware efi64
     & $vboxManage modifyvm $vmName --memory 2048
-    & $vboxManage modifyvm $vmName --cpus 2
+    & $vboxManage modifyvm $vmName --cpus 1
     & $vboxManage storagectl $vmName --name "SATA" --add sata --controller IntelAHCI --bootable on
     
     # Configure COM1 Serial Port to file for diagnostics

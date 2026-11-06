@@ -1,8 +1,11 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
 mod arch;
 mod console;
+mod memory;
 
 use core::panic::PanicInfo;
 use kinetix_boot_protocol::BootInfo;
@@ -84,11 +87,17 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
                 i, name, module.physical_address, module.size
             );
         }
+
+        // 5. Initialize Memory Management Subsystem (Phase 7)
+        memory::init(boot_info);
+
+        // 6. Execute Memory Verification Self-Tests
+        memory::run_memory_tests();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 4 Milestone achieved: Kernel execution stable.");
+    println!("[KERNEL] Phase 7 Milestone achieved: Kernel Memory Management operational.");
 
     // Halt CPU loop waiting for interrupts
     arch::cpu::halt_loop();

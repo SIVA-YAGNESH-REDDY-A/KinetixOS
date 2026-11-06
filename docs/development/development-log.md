@@ -62,3 +62,21 @@ This document tracks chronological engineering milestones, architectural choices
   - Usable physical memory: 2004 MiB.
   - Linear framebuffer: `0x80000000` (1024x768).
   - Kernel Status: **RUNNING**.
+
+---
+
+### [2026-11-06] — Phase 7: Kernel Memory Management Subsystem
+* **Action**: Designed and implemented 3-tier memory management foundation:
+  1. `BitmapFrameAllocator` (`kernel/kinetix-kernel/src/memory/frame.rs`): 4 GiB physical memory bitmap tracking 1,048,576 frames (4 KiB each). 128 KiB bitmap placed in kernel BSS (zero file footprint). Scans UEFI memory map, sets usable frames, and enforces reservation guards for Page 0, real-mode/BIOS (0..1 MiB), kernel binary image (0x200000..0x229000), framebuffer (0x80000000), and kernel heap.
+  2. 4-Level Paging (`kernel/kinetix-kernel/src/memory/paging.rs`): Virtual address decomposition (PML4, PDPT, PD, PT), page table entries, flags, active CR3 register reading via inline assembly, and page table walker translating virtual to physical addresses.
+  3. Intrusive Coalescing Free-List Kernel Heap Allocator (`kernel/kinetix-kernel/src/memory/heap.rs`): Implements `core::alloc::GlobalAlloc` with boundary-tag address sorting and immediate coalescing to prevent heap fragmentation. Configured with a 4 MiB initial heap at physical `0x0040_0000`. Registered as `#[global_allocator]`.
+* **Action**: Unlocked Rust's `alloc` crate (`extern crate alloc;`) in `kinetix-kernel`, enabling `Box`, `Vec`, `String`, and standard collections.
+* **Action**: Added exported linker symbols `__kernel_start` and `__kernel_end` in `linker.ld` to dynamically guard kernel memory pages.
+* **Action**: Implemented in-kernel memory self-tests verifying frame alloc/dealloc/alignment, page table virtual-to-physical translation, `Box` allocation/drop, dynamic `Vec` growth (500 elements), and `format!` heap strings.
+* **Action**: Updated `scripts/windows/run-virtualbox.ps1` to detect and stop running VMs before disk conversion and lock release.
+* **Milestone**: **PHASE 7 COMPLETED & VERIFIED IN VIRTUALBOX**. Serial log verified all 5 tests passed:
+  - Total usable RAM: 2004 MiB (513,105 frames).
+  - Free physical RAM: 2003 MiB (512,945 frames).
+  - Active CR3 root: `0x7EE01000`.
+  - Kernel Heap available: 4096 KiB (4,194,304 bytes).
+  - All tests `[PASS]`. Status: `Phase 7 Milestone achieved: Kernel Memory Management operational.`
