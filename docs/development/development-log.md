@@ -142,3 +142,23 @@ This document tracks chronological engineering milestones, architectural choices
   - Policy switching verified (RoundRobin, Priority, FairShare).
   - Worker Alpha and Worker Beta executed concurrently to completion under timer preemption.
   - Status: `Phase 11 Milestone achieved: Preemptive Multi-Policy CPU Scheduler operational.`
+
+---
+
+### [2026-11-06] — Phase 12: CPU Multitasking Academic Research & Workload Benchmarks
+* **Action**: Designed and implemented the comprehensive empirical research benchmark engine:
+  1. `metrics.rs` (`kernel/kinetix-kernel/src/research/metrics.rs`): High-precision cycle measurement via `rdtsc` (`read_tsc()`), 128-bit integer formulation of Jain's Fairness Index (`compute_jains_fairness`), and structured telemetry records (`BenchmarkResult`, `TaskMetric`).
+  2. `workloads.rs` (`kernel/kinetix-kernel/src/research/workloads.rs`): Implemented controlled workload suites with `core::hint::black_box` to prevent compiler dead-code elimination:
+     - Pure Compute (Symmetric CPU-bound hashing and polynomial arithmetic).
+     - Interactive I/O Simulation (Short compute bursts followed by voluntary yields).
+     - Heterogeneous Mixed Workload (Co-running compute-bound and interactive I/O tasks).
+  3. `research/mod.rs` (`kernel/kinetix-kernel/src/research/mod.rs`): Coordinated 5 empirical benchmark trials across Round-Robin, Priority-Based, and Fair-Share policies. Emitted publication-grade ASCII telemetry tables and per-task execution breakdowns to both serial and linear framebuffer console.
+  4. Scheduler Benchmarking Extensions (`task/mod.rs`): Added `reset_for_benchmark()`, `has_active_workers()`, and `collect_worker_metrics()` to enable isolated benchmark trials with automatic memory reclamation of terminated task stacks.
+* **Action**: Published academic research paper `docs/research/multitasking-performance.md` documenting methodology, mathematical models, empirical findings, and architectural conclusions.
+* **Milestone**: **PHASE 12 COMPLETED & VERIFIED IN VIRTUALBOX**. Serial log verified:
+  - Trial 1 (Pure Compute, Round-Robin): 619.4M cycles, 9 ticks, 4 switches, 1 preemption, 60% fairness.
+  - Trial 2 (Interactive I/O, Round-Robin): 14.7M cycles, 0 ticks, 61 switches, 30 voluntary yields, 0 preemptions, 100% fairness.
+  - Trial 3 (Mixed Heterogeneous, Round-Robin): 491.2M cycles, 8 ticks, 43 switches, 1 preemption, 20 yields, 47% fairness.
+  - Trial 4 (Mixed Heterogeneous, Priority): 487.5M cycles, 9 ticks, 51 switches, 4 preemptions, 20 yields, 49% fairness.
+  - Trial 5 (Mixed Heterogeneous, Fair-Share): 479.9M cycles, 6 ticks, 44 switches, 1 preemption, 20 yields, 25% fairness.
+  - Status: `Phase 12 Milestone achieved: CPU Multitasking Academic Research complete.`

@@ -6,6 +6,7 @@ extern crate alloc;
 mod arch;
 mod console;
 mod memory;
+mod research;
 mod task;
 
 use core::panic::PanicInfo;
@@ -112,11 +113,14 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
         // 10. Initialize Multitasking & Preemptive Multi-Policy Scheduler (Phases 10 & 11)
         task::init();
         task::run_scheduler_tests();
+
+        // 11. Execute CPU Multitasking Academic Research Benchmarks (Phase 12)
+        research::run_research_experiments();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 11 Milestone achieved: Preemptive Multi-Policy CPU Scheduler operational.");
+    println!("[KERNEL] Phase 12 Milestone achieved: CPU Multitasking Academic Research complete.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();

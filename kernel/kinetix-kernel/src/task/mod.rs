@@ -15,6 +15,7 @@ use spin::Mutex;
 
 pub use scheduler::SchedulingPolicy;
 pub use tcb::{Priority, Task, TaskId, TaskState};
+use crate::research::metrics::TaskMetric;
 
 /// Global Preemptive Task Manager and Multi-Policy Scheduler.
 pub struct TaskManager {
@@ -102,6 +103,53 @@ impl TaskManager {
         }
         false
     }
+
+    /// Resets the scheduler state for an isolated benchmark trial.
+    /// Retains Task 0 (Kernel Main) and cleans up completed worker tasks.
+    pub fn reset_for_benchmark(&mut self, policy: SchedulingPolicy) {
+        if !self.initialized {
+            self.init();
+        }
+
+        // Truncate to retain only Task 0
+        self.tasks.truncate(1);
+
+        if let Some(main_task) = self.tasks.get_mut(0) {
+            main_task.state = TaskState::Running;
+            main_task.total_ticks_consumed = 0;
+            main_task.ticks_remaining = main_task.quantum_ticks;
+            main_task.context_switches = 0;
+            main_task.voluntary_yields = 0;
+            main_task.preemptions = 0;
+        }
+
+        self.current_index = 0;
+        self.next_id = 1;
+        self.policy = policy;
+        self.preemption_enabled = true;
+    }
+
+    /// Checks if there are any active (non-terminated) worker tasks.
+    pub fn has_active_workers(&self) -> bool {
+        self.tasks.iter().skip(1).any(|t| t.state != TaskState::Terminated)
+    }
+
+    /// Collects execution telemetry from all worker tasks.
+    pub fn collect_worker_metrics(&self) -> Vec<TaskMetric> {
+        self.tasks
+            .iter()
+            .skip(1)
+            .map(|t| TaskMetric {
+                id: t.id.0,
+                name: t.name.clone(),
+                priority: t.priority,
+                ticks_consumed: t.total_ticks_consumed,
+                context_switches: t.context_switches,
+                voluntary_yields: t.voluntary_yields,
+                preemptions: t.preemptions,
+            })
+            .collect()
+    }
 }
 
 pub static TASK_MANAGER: Mutex<TaskManager> = Mutex::new(TaskManager::new());
@@ -135,6 +183,21 @@ pub fn set_policy(policy: SchedulingPolicy) {
 #[allow(dead_code)]
 pub fn set_preemption(enabled: bool) {
     TASK_MANAGER.lock().set_preemption(enabled);
+}
+
+/// Resets scheduler state for an isolated benchmark trial.
+pub fn reset_for_benchmark(policy: SchedulingPolicy) {
+    TASK_MANAGER.lock().reset_for_benchmark(policy);
+}
+
+/// Checks whether any worker tasks are still running or ready.
+pub fn has_active_workers() -> bool {
+    TASK_MANAGER.lock().has_active_workers()
+}
+
+/// Collects execution telemetry from all worker tasks.
+pub fn collect_worker_metrics() -> Vec<TaskMetric> {
+    TASK_MANAGER.lock().collect_worker_metrics()
 }
 
 /// Voluntarily yields CPU execution to the next available ready task.
