@@ -1,15 +1,105 @@
 #![no_std]
 #![no_main]
 
+mod arch;
+mod console;
+
 use core::panic::PanicInfo;
 use kinetix_boot_protocol::BootInfo;
 
+/// Initial dedicated 64 KiB kernel stack.
+#[allow(dead_code)]
+#[repr(align(16))]
+struct KernelStack([u8; 64 * 1024]);
+#[allow(dead_code)]
+static KERNEL_STACK: KernelStack = KernelStack([0; 64 * 1024]);
+
+/// The definitive 64-bit Kinetix Kernel Entry Point.
+///
+/// Handoff contract:
+/// - Called from Kinetix Bootloader after `ExitBootServices()`.
+/// - Argument passed in register `RDI`: pointer to immutable `BootInfo`.
 #[no_mangle]
-pub extern "C" fn _start(_boot_info: &'static BootInfo) -> ! {
-    loop {}
+#[link_section = ".text._start"]
+pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
+    // 1. Initialize Serial Diagnostics (COM1: 0x3F8)
+    arch::serial::SERIAL1.lock().init();
+
+    println!("================================================");
+    println!("                 KINETIX OS                     ");
+    println!("================================================");
+    println!();
+    println!("Kinetix Kernel Initialized");
+    println!();
+    println!("Architecture : x86_64");
+    println!("Language     : Rust (core + no_std)");
+    println!("Boot Mode    : UEFI (64-bit)");
+    println!();
+    println!("Kernel Status: RUNNING");
+    println!();
+    println!("================================================");
+
+    // 2. Validate Boot Information Protocol
+    if boot_info.is_valid() {
+        println!("[KERNEL] BootInfo verification PASSED (Magic: 0x{:X})", boot_info.magic);
+        println!(
+            "[KERNEL] Memory Map: {} regions reported by firmware.",
+            boot_info.memory_map.region_count
+        );
+
+        let mut usable_ram_bytes: u64 = 0;
+        for i in 0..boot_info.memory_map.region_count {
+            let region = &boot_info.memory_map.regions[i];
+            if region.is_usable() {
+                usable_ram_bytes += region.length;
+            }
+        }
+        println!(
+            "[KERNEL] Usable Physical Memory: {} MiB ({} bytes)",
+            usable_ram_bytes / (1024 * 1024),
+            usable_ram_bytes
+        );
+
+        // 3. Initialize Linear Framebuffer if provided
+        if boot_info.framebuffer.physical_address != 0 {
+            println!(
+                "[KERNEL] Framebuffer detected at 0x{:X} ({}x{}, stride: {})",
+                boot_info.framebuffer.physical_address,
+                boot_info.framebuffer.width,
+                boot_info.framebuffer.height,
+                boot_info.framebuffer.stride
+            );
+            console::FRAMEBUFFER_CONSOLE.lock().init(boot_info.framebuffer);
+        } else {
+            println!("[KERNEL] No framebuffer provided; serial console only.");
+        }
+
+        // 4. Report staged application modules
+        println!("[KERNEL] Preloaded Application Modules: {}", boot_info.modules.count);
+        for i in 0..boot_info.modules.count {
+            let module = &boot_info.modules.modules[i];
+            let name = core::str::from_utf8(&module.name).unwrap_or("unknown");
+            println!(
+                "  Module {}: '{}' at 0x{:X} ({} bytes)",
+                i, name, module.physical_address, module.size
+            );
+        }
+    } else {
+        println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
+    }
+
+    println!("[KERNEL] Phase 4 Milestone achieved: Kernel execution stable.");
+
+    // Halt CPU loop waiting for interrupts
+    arch::cpu::halt_loop();
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+fn panic(info: &PanicInfo) -> ! {
+    println!("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    println!("             KERNEL PANIC OCCURRED              ");
+    println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    println!("{}", info);
+    println!("System halted.");
+    arch::cpu::halt_loop();
 }

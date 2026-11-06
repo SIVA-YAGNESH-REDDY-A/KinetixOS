@@ -6,7 +6,7 @@ $env:CARGO_HOME = "D:\Rust\cargo"
 $env:PATH = "D:\Rust\cargo\bin;$env:PATH"
 
 Write-Host "Building Kinetix Kernel (x86_64-unknown-none)..." -ForegroundColor Cyan
-cargo build -p kinetix-kernel --target x86_64-unknown-none --release
+cargo rustc -p kinetix-kernel --target x86_64-unknown-none --release -- -C link-arg=-Tkernel/kinetix-kernel/linker.ld
 
 $outputKernel = "target\x86_64-unknown-none\release\kinetix-kernel"
 if (Test-Path $outputKernel) {
