@@ -1,0 +1,10 @@
+[package]
+name = "kinetix-boot-protocol"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Strictly typed, C-compatible boot information protocol between Kinetix Bootloader and Kinetix Kernel"
+
+[dependencies]
+# Zero dependencies - pure Rust core

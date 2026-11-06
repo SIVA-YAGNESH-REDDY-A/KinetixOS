@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = [
+    "bootloader/kinetix-bootloader",
+    "kernel/kinetix-kernel",
+    "crates/kinetix-boot-protocol",
+    "crates/kinetix-runtime",
+    "tools/kinetix-image-builder",
+    "apps/hello-world",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Kinetix OS Architecture Team"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/kinetix-os/kinetix-os"
+
+[profile.dev]
+panic = "abort"
+opt-level = 1
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = true
+codegen-units = 1

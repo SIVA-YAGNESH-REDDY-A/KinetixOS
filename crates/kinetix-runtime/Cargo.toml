@@ -1,0 +1,10 @@
+[package]
+name = "kinetix-runtime"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Freestanding runtime library and system call interface for Kinetix native applications"
+
+[dependencies]
+# Zero dependencies - pure Rust core

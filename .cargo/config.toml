@@ -1,0 +1,13 @@
+# Cargo configuration for Kinetix OS
+
+[build]
+# Workspace crates target specific architectures explicitly via cargo flags
+
+[target.x86_64-unknown-uefi]
+# UEFI firmware uses PE32+ linked with lld-link (rust-lld)
+
+[target.x86_64-unknown-none]
+# Freestanding kernel uses ELF64 linked with ld.lld (rust-lld)
+rustflags = [
+    "-C", "relocation-model=static",
+]

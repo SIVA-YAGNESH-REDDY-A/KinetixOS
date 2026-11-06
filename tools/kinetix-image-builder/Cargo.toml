@@ -1,0 +1,12 @@
+[package]
+name = "kinetix-image-builder"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Development host tool to generate GPT/FAT32 bootable disk images for Kinetix OS"
+
+[dependencies]
+gpt = "4.1"
+fatfs = "0.3.6"
+fscommon = "0.1"

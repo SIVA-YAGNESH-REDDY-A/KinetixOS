@@ -1,0 +1,24 @@
+# Rust build output
+target/
+**/*.rs.bk
+
+# Generated disk images & release artifacts
+artifacts/
+*.img
+*.iso
+*.vdi
+*.vmdk
+*.bin
+
+# Editor & OS artifacts
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+Desktop.ini
+
+# VirtualBox runtime files
+*.vbox
+*.vbox-prev
+*.log

@@ -1,0 +1,11 @@
+[package]
+name = "hello-world"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Native demonstration application for Kinetix OS"
+
+[dependencies]
+kinetix-runtime = { path = "../../crates/kinetix-runtime" }
+
