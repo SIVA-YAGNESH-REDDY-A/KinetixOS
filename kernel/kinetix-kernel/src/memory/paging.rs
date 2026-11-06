@@ -97,6 +97,21 @@ impl PageTableFlags {
     }
 }
 
+impl core::ops::BitOr for PageTableFlags {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl core::ops::BitOrAssign for PageTableFlags {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
 /// A 64-bit page table entry.
 #[derive(Clone, Copy)]
 #[repr(transparent)]

@@ -183,3 +183,22 @@ This document tracks chronological engineering milestones, architectural choices
   - File reading verified (`/etc/os-release`, `/etc/motd`).
   - Executable inspection: `/bin/hello-world` verified as valid ELF64 binary (1144 bytes, magic: `0x7F 'ELF'`).
   - Status: `Phase 13 Milestone achieved: In-Memory Boot Filesystem (RamFS / ustar) operational.`
+
+---
+
+### [2026-11-06] — Phase 14: Native Application Loader (User ELF64 Relocation)
+* **Action**: Designed and implemented the native ELF64 application loader and isolated user process address space subsystem:
+  1. `app.ld` (`apps/hello-world/app.ld`): Created dedicated user-space application linker script linking `hello-world` at virtual address `0x4000_0000` (1 GiB boundary, within small code model reach), separate from kernel code at 2 MiB and kernel heap at 4 MiB.
+  2. `elf.rs` (`kernel/kinetix-kernel/src/loader/elf.rs`): Zero-copy ELF64 header and program header parser validating machine type (`EM_X86_64`), class (`ELFCLASS64`), little-endian format, entry point, and loadable segment flags (`PF_R`, `PF_W`, `PF_X`).
+  3. `process.rs` (`kernel/kinetix-kernel/src/loader/process.rs`): Implemented `ProcessAddressSpace` creating independent 4-level page tables (`PML4` -> `PDPT` -> `PD` -> `PT`). Inherits kernel identity mapping (0..1 GiB) via `PDPT[0]`, dedicated user space in `PDPT[1]` (`0x4000_0000`..`0x7FFF_FFFF`), user stack allocation (16 KiB at `0x7FFF_F000`), and automatic physical frame cleanup on `Drop`.
+  4. `loader/mod.rs` (`kernel/kinetix-kernel/src/loader/mod.rs`): High-level loader API reading binaries directly from the in-memory RamFS (`/bin/hello-world`), mapping segments, zeroing `.bss`, and running verification tests.
+* **Action**: Published architecture specification: `docs/kernel/application-loader.md`.
+* **Milestone**: **PHASE 14 COMPLETED & VERIFIED IN VIRTUALBOX**. Serial log verified:
+  - Loaded `/bin/hello-world` (9008 bytes) into isolated `ProcessAddressSpace`.
+  - Entry point verified at `0x40000000`.
+  - Virtual-to-physical translation verified (`0x40000000` -> `0x102000`).
+  - Read-only data segment content verified (`"Hello from Kinetix OS Native Application!"` at `0x4000_1000`).
+  - User stack verified (16 KiB at `0x7FFF_F000`, canary written and readback confirmed).
+  - 11 physical frames tracked and 100% reclaimed on drop.
+  - Rejection of invalid/corrupted binaries verified.
+  - Status: `Phase 14 Milestone achieved: Native Application Loader (User ELF64 Relocation) operational.`

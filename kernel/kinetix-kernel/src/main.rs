@@ -6,6 +6,7 @@ extern crate alloc;
 mod arch;
 mod console;
 mod fs;
+mod loader;
 mod memory;
 mod research;
 mod task;
@@ -105,27 +106,30 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
         fs::init(boot_info);
         fs::run_fs_tests();
 
-        // 8. Initialize CPU Architecture & Interrupt Infrastructure (Phase 8)
+        // 8. Execute Native Application Loader Verification Self-Tests (Phase 14)
+        loader::run_loader_tests();
+
+        // 9. Initialize CPU Architecture & Interrupt Infrastructure (Phase 8)
         arch::init();
 
-        // 9. Execute Exception & Hardware Interrupt Verification Self-Tests
+        // 10. Execute Exception & Hardware Interrupt Verification Self-Tests
         arch::run_interrupt_tests();
 
-        // 10. Execute Hardware Interaction Verification Self-Tests (Phase 9)
+        // 11. Execute Hardware Interaction Verification Self-Tests (Phase 9)
         console::run_console_tests();
         arch::keyboard::run_keyboard_tests();
 
-        // 11. Initialize Multitasking & Preemptive Multi-Policy Scheduler (Phases 10 & 11)
+        // 12. Initialize Multitasking & Preemptive Multi-Policy Scheduler (Phases 10 & 11)
         task::init();
         task::run_scheduler_tests();
 
-        // 12. Execute CPU Multitasking Academic Research Benchmarks (Phase 12)
+        // 13. Execute CPU Multitasking Academic Research Benchmarks (Phase 12)
         research::run_research_experiments();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 13 Milestone achieved: In-Memory Boot Filesystem (RamFS / ustar) operational.");
+    println!("[KERNEL] Phase 14 Milestone achieved: Native Application Loader (User ELF64 Relocation) operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();
