@@ -219,3 +219,21 @@ This document tracks chronological engineering milestones, architectural choices
   - Resumption after `#GP`: `frame.rip += 1` advanced past faulting instruction and reached second breakpoint cleanly.
   - Stack switching and clean kernel unwinding: returned safely to caller, dropped `ProcessAddressSpace`, and reclaimed all 10 physical frames.
   - Status: `[KERNEL] Phase 15 Milestone achieved: User Mode (Ring 3 Privilege Separation) operational.`
+
+## Phase 16: System Call ABI (`syscall` / `sysret`) — 2026-11-06
+- **Objective**: Design and implement high-performance, low-latency fast system calls using x86_64 `syscall` / `sysretq`, Model-Specific Register configuration (MSRs `0xC0000080`..`0xC0000084`), kernel stack switching, System V AMD64 argument marshalling, user-space pointer bounds validation (`-EFAULT`), and core system services (`SYS_PRINT`, `SYS_YIELD`, `SYS_EXIT`, `SYS_GETPID`, `SYS_UPTIME_MS`).
+- **Architectural Implementation**:
+  - `arch/cpu.rs`: Implemented `rdmsr` and `wrmsr` assembly intrinsics.
+  - `syscall/entry.rs`: Configured `IA32_EFER.SCE`, `IA32_STAR` (Kernel 0x08/0x10, User 0x1B/0x23), `IA32_LSTAR` (`syscall_entry`), and `IA32_SFMASK` (masking IF, DF, TF). Built assembly entry/exit stubs with stack switching to dedicated 16 KiB `KERNEL_SYSCALL_STACK`, register preservation, and `run_user_process` / `exit_user_process_asm`.
+  - `syscall/mod.rs`: Implemented central `syscall_dispatch` routing with user address validation (`0x4000_0000 .. 0x8000_0000`), UTF-8 validation, and core syscall implementations.
+  - `crates/kinetix-runtime`: Unified user-space runtime constants and wrappers (`sys_print`, `sys_yield`, `sys_exit`, `getpid`, `uptime_ms`).
+  - `main.rs`: Integrated `syscall::init()` and `syscall::run_syscall_tests()`.
+- **Empirical Verification (Oracle VirtualBox 7.2)**:
+  - Hardware MSRs verified: `EFER.SCE` set, `STAR` selectors correct, `LSTAR` points to `syscall_entry`, `SFMASK` masks interrupts.
+  - `SYS_PRINT` verified: unprivileged Ring 3 probe printed string to console.
+  - Security boundary verified: `SYS_PRINT` with kernel pointer `0x200000` rejected with `EFAULT` (`-14`).
+  - `SYS_GETPID` returned PID 1; `SYS_UPTIME_MS` returned positive tick count.
+  - `SYS_YIELD` voluntarily yielded CPU and resumed execution in Ring 3 cleanly.
+  - `SYS_EXIT(42)` terminated user execution and returned exit code 42 to kernel caller.
+  - All 10 user physical frames reclaimed on drop.
+  - Status: `[KERNEL] Phase 16 Milestone achieved: System Call ABI (syscall / sysret) operational.`

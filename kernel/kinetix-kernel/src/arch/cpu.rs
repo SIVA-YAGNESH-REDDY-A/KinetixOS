@@ -58,6 +58,35 @@ pub fn read_cr2() -> u64 {
     value
 }
 
+/// Reads a 64-bit Model-Specific Register (MSR).
+#[inline(always)]
+pub unsafe fn rdmsr(msr: u32) -> u64 {
+    let low: u32;
+    let high: u32;
+    asm!(
+        "rdmsr",
+        in("ecx") msr,
+        out("eax") low,
+        out("edx") high,
+        options(nomem, nostack, preserves_flags)
+    );
+    ((high as u64) << 32) | (low as u64)
+}
+
+/// Writes a 64-bit value to a Model-Specific Register (MSR).
+#[inline(always)]
+pub unsafe fn wrmsr(msr: u32, value: u64) {
+    let low = value as u32;
+    let high = (value >> 32) as u32;
+    asm!(
+        "wrmsr",
+        in("ecx") msr,
+        in("eax") low,
+        in("edx") high,
+        options(nomem, nostack, preserves_flags)
+    );
+}
+
 /// Halts the CPU in an infinite loop (for panic or idle task).
 pub fn halt_loop() -> ! {
     loop {

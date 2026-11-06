@@ -11,6 +11,7 @@ mod memory;
 mod research;
 mod task;
 mod user;
+mod syscall;
 
 use core::panic::PanicInfo;
 use kinetix_boot_protocol::BootInfo;
@@ -127,8 +128,9 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
         // 8. Execute Native Application Loader Verification Self-Tests (Phase 14)
         loader::run_loader_tests();
 
-        // 9. Initialize CPU Architecture & Interrupt Infrastructure (Phase 8)
+        // 9. Initialize CPU Architecture, Interrupt Infrastructure, and System Calls (Phases 8 & 16)
         arch::init();
+        syscall::init();
 
         // 10. Execute Exception & Hardware Interrupt Verification Self-Tests
         arch::run_interrupt_tests();
@@ -146,11 +148,14 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
         // 14. Execute User Mode (Ring 3 Privilege Separation) Verification Tests (Phase 15)
         user::run_user_mode_tests();
+
+        // 15. Execute System Call ABI (syscall / sysret) Verification Tests (Phase 16)
+        syscall::run_syscall_tests();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 15 Milestone achieved: User Mode (Ring 3 Privilege Separation) operational.");
+    println!("[KERNEL] Phase 16 Milestone achieved: System Call ABI (syscall / sysret) operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();
