@@ -28,3 +28,31 @@ This document tracks chronological engineering milestones, architectural choices
 * **Action**: Formulated modular Cargo workspace manifest (`Cargo.toml`) with pinned `rust-toolchain.toml`.
 * **Action**: Configured compilation targets in `.cargo/config.toml`.
 * **Action**: Created standard project guidelines (`README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `.gitignore`).
+* **Action**: Initialized Git repository and created initial commit `be231d0`.
+
+---
+
+### [2026-11-06] — Phase 3: First UEFI Bootloader & Disk Image Builder
+* **Action**: Implemented `kinetix-bootloader` in pure Rust targetting `x86_64-unknown-uefi`.
+* **Action**: Implemented 16550 UART COM1 serial diagnostics driver (`bootloader/kinetix-bootloader/src/serial.rs`).
+* **Action**: Implemented pure-Rust GPT partition table and protective MBR generator (`tools/kinetix-image-builder/src/gpt.rs`) without external C or dynamic library dependencies.
+* **Action**: Generated first raw 64 MiB GPT bootable disk image with FAT32 ESP partition (`artifacts/boot-images/kinetix-os-bootloader.img`). Verified MBR signature `0xAA55` and GPT signature `'EFI PART'`.
+
+---
+
+### [2026-11-06] — Phase 4: First Kinetix Kernel
+* **Action**: Implemented freestanding 64-bit kernel in Rust targetting `x86_64-unknown-none`.
+* **Action**: Configured kernel linker script (`kernel/kinetix-kernel/linker.ld`) placing `.text` at 2 MiB (`0x0020_0000`) with 4 KiB page-aligned sections.
+* **Action**: Implemented COM1 serial logging macros (`print!`, `println!`) protected by spinlock `Mutex`.
+* **Action**: Implemented direct linear framebuffer console scaffolding.
+* **Action**: Verified ELF64 binary format and entry address `0x0020_0000` via `llvm-objdump`.
+
+---
+
+### [2026-11-06] — Phase 5: Bootloader-to-Kernel Integration
+* **Action**: Implemented ELF64 parser and loader in `kinetix-bootloader` (`loader.rs`).
+* **Action**: Implemented file reading via UEFI `SimpleFileSystem` protocol to load `/KINETIX/KERNEL/KINETIX-KERNEL.ELF`.
+* **Action**: Allocated physical pages and mapped `PT_LOAD` segments into memory.
+* **Action**: Initialized GOP framebuffer and recorded metadata into `BootInfo`.
+* **Action**: Implemented clean handoff via `ExitBootServices`, mapped the UEFI memory map into Kinetix memory regions, and transferred execution control to `kernel_entry(&BOOT_INFO)`.
+* **Action**: Implemented end-to-end OS build pipeline (`scripts/windows/build-os.ps1` and `build-image.ps1`).
