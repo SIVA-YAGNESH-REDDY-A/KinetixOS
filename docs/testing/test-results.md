@@ -1,0 +1,14 @@
+# Kinetix OS — Test Results & Verification Log
+
+This document records chronological test results, configurations, expected vs actual behaviors, and verification evidence for each subphase.
+
+| Test ID | Feature | Date | Toolchain | Configuration | Expected Result | Actual Result | Status | Evidence |
+|---|---|---|---|---|---|---|---|---|
+| `TEST-001` | Toolchain smoke test (UEFI) | 2026-11-04 | Rust 1.99.1 stable | `x86_64-unknown-uefi` | Produce valid PE32+ `coff-x86-64` | `llvm-objdump -f` confirmed `file format coff-x86-64` | **PASS** | `smoke_test/uefi_test.efi` |
+| `TEST-002` | Toolchain smoke test (None) | 2026-11-04 | Rust 1.99.1 stable | `x86_64-unknown-none` | Produce valid ELF64 `elf64-x86-64` | `llvm-objdump -f` confirmed `file format elf64-x86-64` | **PASS** | `smoke_test/none_test` |
+| `TEST-003` | Crate index & MSRV verification | 2026-11-04 | Cargo 1.99.1 | crates.io network check | Confirm versions and `no_std` support | `uefi 0.41.0`, `x86_64 0.15.5`, `spin 0.12.3`, `fatfs 0.3.6`, `gpt 4.1.0` verified | **PASS** | `cargo info` logs |
+| `TEST-004` | Workspace member resolution | 2026-11-06 | Rust 1.99.1 stable | Cargo workspace resolver 2 | Check all crates across different targets | All 6 crates checked without error; `Cargo.lock` created | **PASS** | `cargo check --workspace` |
+| `TEST-005` | Workspace compilation pipeline | 2026-11-06 | Rust 1.99.1 stable | Mixed targets (`uefi`, `none`, host `gnu`) | Compiles bootloader, kernel, protocol, runtime, app, image-builder | `kinetix-bootloader`, `kinetix-kernel`, `hello-world`, `kinetix-image-builder` all check cleanly | **PASS** | Exit code 0 |
+| `TEST-006` | First UEFI Bootloader Build | 2026-11-06 | Rust 1.99.1 stable | `x86_64-unknown-uefi` | Compile `kinetix-bootloader.efi` | `llvm-objdump -f` confirmed `file format coff-x86-64` (21,504 bytes) | **PASS** | `target/.../kinetix-bootloader.efi` |
+| `TEST-007` | Host Disk Image Builder Build | 2026-11-06 | Rust 1.99.1 stable | Host tool `std` (MinGW) | Build GPT & FAT32 partitioner without C dependencies | Compiled in 3.66s | **PASS** | `target/debug/kinetix-image-builder.exe` |
+| `TEST-008` | Boot Image Assembly & Inspection | 2026-11-06 | Kinetix Image Builder | 64 MiB GPT Disk with FAT32 ESP | Protective MBR (0xAA55) & GPT Header ('EFI PART') valid | Verified: MBR 0xAA55, GPT 'EFI PART', ESP at LBA 2048 | **PASS** | `artifacts/boot-images/kinetix-os-bootloader.img` |

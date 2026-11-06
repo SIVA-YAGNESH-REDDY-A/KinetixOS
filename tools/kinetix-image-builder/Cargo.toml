@@ -7,6 +7,5 @@ license.workspace = true
 description = "Development host tool to generate GPT/FAT32 bootable disk images for Kinetix OS"
 
 [dependencies]
-gpt = "4.1"
-fatfs = "0.3.6"
+fatfs = { version = "0.3.6", default-features = false, features = ["std"] }
 fscommon = "0.1"
