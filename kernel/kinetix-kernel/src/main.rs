@@ -109,14 +109,14 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
         console::run_console_tests();
         arch::keyboard::run_keyboard_tests();
 
-        // 10. Initialize Cooperative Task Management & CPU Context Switching (Phase 10)
+        // 10. Initialize Multitasking & Preemptive Multi-Policy Scheduler (Phases 10 & 11)
         task::init();
-        task::run_task_tests();
+        task::run_scheduler_tests();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 10 Milestone achieved: Cooperative Task Management & Context Switching operational.");
+    println!("[KERNEL] Phase 11 Milestone achieved: Preemptive Multi-Policy CPU Scheduler operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();

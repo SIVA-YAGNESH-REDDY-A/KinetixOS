@@ -1,6 +1,7 @@
 //! Task Control Block (TCB) & Task Representation for Kinetix OS.
 //!
-//! Encapsulates execution state, unique task identifiers, and dedicated kernel stacks.
+//! Encapsulates execution state, unique task identifiers, priorities,
+//! execution telemetry, and dedicated kernel stacks.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -20,6 +21,29 @@ pub enum TaskState {
     Terminated,
 }
 
+/// Task execution priority levels.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Priority {
+    Low = 1,
+    Normal = 2,
+    High = 3,
+    Realtime = 4,
+}
+
+impl Priority {
+    /// Standard time-slice quantum in timer ticks (each tick = 10 ms at 100 Hz).
+    #[allow(dead_code)]
+    pub fn default_quantum_ticks(&self) -> u32 {
+        match self {
+            Priority::Low => 2,       // 20 ms
+            Priority::Normal => 4,    // 40 ms
+            Priority::High => 8,      // 80 ms
+            Priority::Realtime => 12, // 120 ms
+        }
+    }
+}
+
 /// Standard kernel task stack size: 64 KiB (16 pages).
 pub const KERNEL_STACK_SIZE: usize = 64 * 1024;
 
@@ -29,26 +53,26 @@ pub struct Task {
     pub id: TaskId,
     pub name: String,
     pub state: TaskState,
+    pub priority: Priority,
     pub rsp: u64,
     pub stack: Option<Vec<u8>>,
+
+    // Telemetry and Quantum Scheduling Metrics
+    pub quantum_ticks: u32,
+    pub ticks_remaining: u32,
+    pub total_ticks_consumed: u64,
+    pub context_switches: u64,
+    pub voluntary_yields: u64,
+    pub preemptions: u64,
 }
 
 impl Task {
-    /// Creates a new cooperative kernel task with its own dedicated 64 KiB stack.
-    pub fn new_kernel_task(id: TaskId, name: &str, entry_fn: fn()) -> Self {
+    /// Creates a new kernel task with specified priority and a dedicated 64 KiB stack.
+    pub fn new_kernel_task(id: TaskId, name: &str, priority: Priority, entry_fn: fn()) -> Self {
         let stack = alloc::vec![0u8; KERNEL_STACK_SIZE];
-
-        // Align stack top to 16 bytes
         let stack_top = (stack.as_ptr() as usize + stack.len()) & !0x0F;
+        let quantum = priority.default_quantum_ticks();
 
-        // Initialize stack frame to simulate a suspended context:
-        // [stack_top - 8 ]: Address of task_trampoline (popped by ret in switch_context)
-        // [stack_top - 16]: Initial RBX
-        // [stack_top - 24]: Initial RBP
-        // [stack_top - 32]: Initial R12 = entry_fn function pointer
-        // [stack_top - 40]: Initial R13
-        // [stack_top - 48]: Initial R14
-        // [stack_top - 56]: Initial R15
         let initial_rsp = unsafe {
             let ptr = stack_top as *mut usize;
             ptr.sub(1).write(task_trampoline as *const () as usize); // RIP return address
@@ -65,19 +89,36 @@ impl Task {
             id,
             name: String::from(name),
             state: TaskState::Ready,
+            priority,
             rsp: initial_rsp,
             stack: Some(stack),
+            quantum_ticks: quantum,
+            ticks_remaining: quantum,
+            total_ticks_consumed: 0,
+            context_switches: 0,
+            voluntary_yields: 0,
+            preemptions: 0,
         }
     }
 
     /// Wraps the current boot thread into Task 0 ("Kernel Main").
     pub fn new_main_task(id: TaskId, name: &str) -> Self {
+        let priority = Priority::Normal;
+        let quantum = priority.default_quantum_ticks();
+
         Self {
             id,
             name: String::from(name),
             state: TaskState::Running,
-            rsp: 0, // Will be set when Task 0 yields
+            priority,
+            rsp: 0,
             stack: None,
+            quantum_ticks: quantum,
+            ticks_remaining: quantum,
+            total_ticks_consumed: 0,
+            context_switches: 0,
+            voluntary_yields: 0,
+            preemptions: 0,
         }
     }
 }

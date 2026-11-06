@@ -242,6 +242,7 @@ fn handle_irq(frame: &TrapFrame) {
             unsafe {
                 PICS.lock().notify_end_of_interrupt(frame.vector as u8);
             }
+            crate::task::handle_timer_tick();
         }
         1 => {
             // IRQ 1: PS/2 Keyboard

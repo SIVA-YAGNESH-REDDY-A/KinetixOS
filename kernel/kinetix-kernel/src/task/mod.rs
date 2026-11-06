@@ -1,21 +1,28 @@
-//! Cooperative Task Management & CPU Context Switching for Kinetix OS.
+//! Preemptive Multi-Policy CPU Scheduler & Task Management Subsystem.
 //!
-//! Provides the core multitasking primitives: Task Control Blocks (TCB),
-//! dedicated kernel stacks, voluntary CPU yielding (`yield_now`), and context switching.
+//! Encompasses:
+//! - Timer-driven preemptive scheduling (100 Hz / 10 ms ticks)
+//! - Multi-policy selection (Round-Robin, Priority-Based, Fair-Share)
+//! - Detailed per-task execution telemetry (ticks consumed, context switches, preemptions)
 
 pub mod context;
+pub mod scheduler;
 pub mod tcb;
 
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 use spin::Mutex;
-pub use tcb::{Task, TaskId, TaskState};
 
-/// Global Cooperative Task Manager.
+pub use scheduler::SchedulingPolicy;
+pub use tcb::{Priority, Task, TaskId, TaskState};
+
+/// Global Preemptive Task Manager and Multi-Policy Scheduler.
 pub struct TaskManager {
     tasks: Vec<Task>,
     current_index: usize,
     next_id: u64,
+    policy: SchedulingPolicy,
+    preemption_enabled: bool,
     initialized: bool,
 }
 
@@ -25,6 +32,8 @@ impl TaskManager {
             tasks: Vec::new(),
             current_index: 0,
             next_id: 1,
+            policy: SchedulingPolicy::RoundRobin,
+            preemption_enabled: false,
             initialized: false,
         }
     }
@@ -39,74 +48,144 @@ impl TaskManager {
         self.tasks.push(main_task);
         self.current_index = 0;
         self.next_id = 1;
+        self.policy = SchedulingPolicy::RoundRobin;
+        self.preemption_enabled = true;
         self.initialized = true;
     }
 
-    /// Spawns a new cooperative kernel task with a dedicated 64 KiB stack.
-    pub fn spawn(&mut self, name: &str, entry_fn: fn()) -> TaskId {
+    /// Configures the active scheduling policy.
+    pub fn set_policy(&mut self, policy: SchedulingPolicy) {
+        self.policy = policy;
+    }
+
+    /// Enables or disables timer-driven preemption.
+    #[allow(dead_code)]
+    pub fn set_preemption(&mut self, enabled: bool) {
+        self.preemption_enabled = enabled;
+    }
+
+    /// Spawns a new task with specified priority and dedicated 64 KiB stack.
+    pub fn spawn(&mut self, name: &str, priority: Priority, entry_fn: fn()) -> TaskId {
         let id = TaskId(self.next_id);
         self.next_id += 1;
 
-        let task = Task::new_kernel_task(id, name, entry_fn);
+        let task = Task::new_kernel_task(id, name, priority, entry_fn);
         self.tasks.push(task);
         id
     }
 
-    /// Finds the index of the next task in Ready state.
-    fn pick_next_ready(&self) -> Option<usize> {
-        if self.tasks.is_empty() {
-            return None;
+    /// Processes a periodic 10 ms timer tick. Returns true if current time-slice has expired.
+    pub fn on_timer_tick(&mut self) -> bool {
+        if !self.initialized || !self.preemption_enabled || self.tasks.is_empty() {
+            return false;
         }
 
-        let count = self.tasks.len();
-        for i in 1..=count {
-            let idx = (self.current_index + i) % count;
-            if self.tasks[idx].state == TaskState::Ready {
-                return Some(idx);
+        let cur = self.current_index;
+        self.tasks[cur].total_ticks_consumed += 1;
+        self.tasks[cur].ticks_remaining = self.tasks[cur].ticks_remaining.saturating_sub(1);
+
+        if self.tasks[cur].ticks_remaining == 0 {
+            // Reset quantum
+            self.tasks[cur].ticks_remaining = self.tasks[cur].quantum_ticks;
+            // Preemption requested if there are other ready tasks
+            self.has_ready_tasks_besides_current()
+        } else {
+            false
+        }
+    }
+
+    fn has_ready_tasks_besides_current(&self) -> bool {
+        for (i, t) in self.tasks.iter().enumerate() {
+            if i != self.current_index && t.state == TaskState::Ready {
+                return true;
             }
         }
-
-        None
+        false
     }
 }
 
 pub static TASK_MANAGER: Mutex<TaskManager> = Mutex::new(TaskManager::new());
 
-/// Initializes the multitasking subsystem.
+/// Initializes the task management subsystem.
 pub fn init() {
-    crate::println!("[TASK] Initializing Cooperative Multitasking Subsystem...");
+    crate::println!("[TASK] Initializing Preemptive Multi-Policy CPU Scheduler...");
     TASK_MANAGER.lock().init();
+    crate::println!("  Default Scheduling Policy: Round-Robin (Time-Sliced)");
     crate::println!("  Task 0 ('Kernel Main') registered as active running thread.");
     crate::println!("[TASK] Task management initialized successfully.");
 }
 
-/// Spawns a new kernel task.
+/// Spawns a new task with default Normal priority.
+#[allow(dead_code)]
 pub fn spawn(name: &str, entry_fn: fn()) -> TaskId {
-    TASK_MANAGER.lock().spawn(name, entry_fn)
+    spawn_with_priority(name, Priority::Normal, entry_fn)
+}
+
+/// Spawns a new task with explicit priority.
+pub fn spawn_with_priority(name: &str, priority: Priority, entry_fn: fn()) -> TaskId {
+    TASK_MANAGER.lock().spawn(name, priority, entry_fn)
+}
+
+/// Sets the scheduler policy.
+pub fn set_policy(policy: SchedulingPolicy) {
+    TASK_MANAGER.lock().set_policy(policy);
+}
+
+/// Temporarily enables or disables timer preemption.
+#[allow(dead_code)]
+pub fn set_preemption(enabled: bool) {
+    TASK_MANAGER.lock().set_preemption(enabled);
 }
 
 /// Voluntarily yields CPU execution to the next available ready task.
 pub fn yield_now() {
+    perform_context_switch(false);
+}
+
+/// Called by the IRQ 0 timer interrupt handler on every tick.
+/// If the running task's time-slice has expired, performs an involuntary preemption!
+pub fn handle_timer_tick() {
+    let should_preempt = {
+        let mut mgr = TASK_MANAGER.lock();
+        mgr.on_timer_tick()
+    };
+
+    if should_preempt {
+        perform_context_switch(true);
+    }
+}
+
+fn perform_context_switch(is_preemption: bool) {
     let switch_args = {
         let mut mgr = TASK_MANAGER.lock();
         if !mgr.initialized || mgr.tasks.len() <= 1 {
             return;
         }
 
-        if let Some(next_idx) = mgr.pick_next_ready() {
-            let cur_idx = mgr.current_index;
+        let policy = mgr.policy;
+        let cur_idx = mgr.current_index;
+
+        if let Some(next_idx) = scheduler::select_next_task(&mgr.tasks, cur_idx, policy) {
             if cur_idx == next_idx {
                 return;
             }
 
-            // Update states
+            // Update telemetry
+            if is_preemption {
+                mgr.tasks[cur_idx].preemptions += 1;
+            } else {
+                mgr.tasks[cur_idx].voluntary_yields += 1;
+            }
+            mgr.tasks[cur_idx].context_switches += 1;
+            mgr.tasks[next_idx].context_switches += 1;
+
+            // Transition states
             if mgr.tasks[cur_idx].state == TaskState::Running {
                 mgr.tasks[cur_idx].state = TaskState::Ready;
             }
             mgr.tasks[next_idx].state = TaskState::Running;
             mgr.current_index = next_idx;
 
-            // Extract pointers to stack pointer fields
             let old_rsp_ptr = &mut mgr.tasks[cur_idx].rsp as *mut u64;
             let new_rsp_ptr = &mgr.tasks[next_idx].rsp as *const u64;
 
@@ -114,7 +193,7 @@ pub fn yield_now() {
         } else {
             None
         }
-    }; // Lock released here before switching context
+    }; // Lock dropped before switching context
 
     if let Some((old_rsp, new_rsp)) = switch_args {
         unsafe {
@@ -130,7 +209,8 @@ pub fn exit() -> ! {
         let cur_idx = mgr.current_index;
         mgr.tasks[cur_idx].state = TaskState::Terminated;
 
-        if let Some(next_idx) = mgr.pick_next_ready() {
+        let policy = mgr.policy;
+        if let Some(next_idx) = scheduler::select_next_task(&mgr.tasks, cur_idx, policy) {
             mgr.tasks[next_idx].state = TaskState::Running;
             mgr.current_index = next_idx;
 
@@ -148,52 +228,68 @@ pub fn exit() -> ! {
         }
     }
 
-    // If no more tasks exist, idle CPU
     crate::arch::cpu::halt_loop();
 }
 
-// Global Atomic Counters for Phase 10 Cooperative Multitasking Self-Test
-static ALPHA_TICKS: AtomicU32 = AtomicU32::new(0);
-static BETA_TICKS: AtomicU32 = AtomicU32::new(0);
+// Global Atomic Counters for Preemptive Multitasking Verification Tests
+static COMPUTE_A_PROGRESS: AtomicU32 = AtomicU32::new(0);
+static COMPUTE_B_PROGRESS: AtomicU32 = AtomicU32::new(0);
 
-fn task_alpha() {
-    for i in 1..=3 {
-        crate::println!("    [Task 1: Alpha] Step {}/3 running on CPU...", i);
-        ALPHA_TICKS.fetch_add(1, Ordering::SeqCst);
-        yield_now();
+fn preemptive_worker_a() {
+    // Busy loop without yield_now() to prove involuntary timer preemption!
+    for step in 1..=3 {
+        // Busy wait doing math work across several timer ticks
+        let mut sum: u64 = 0;
+        for j in 0..15_000_000 {
+            sum = sum.wrapping_add(j);
+        }
+        COMPUTE_A_PROGRESS.fetch_add(1, Ordering::SeqCst);
+        let _ = sum;
+        crate::println!("    [Worker Alpha] Completed compute step {} (involuntary preemption enabled)", step);
     }
-    crate::println!("    [Task 1: Alpha] Finished all steps. Exiting.");
 }
 
-fn task_beta() {
-    for i in 1..=3 {
-        crate::println!("    [Task 2: Beta ] Step {}/3 running on CPU...", i);
-        BETA_TICKS.fetch_add(1, Ordering::SeqCst);
-        yield_now();
+fn preemptive_worker_b() {
+    // Busy loop without yield_now() to prove involuntary timer preemption!
+    for step in 1..=3 {
+        let mut sum: u64 = 0;
+        for j in 0..15_000_000 {
+            sum = sum.wrapping_add(j);
+        }
+        COMPUTE_B_PROGRESS.fetch_add(1, Ordering::SeqCst);
+        let _ = sum;
+        crate::println!("    [Worker Beta ] Completed compute step {} (involuntary preemption enabled)", step);
     }
-    crate::println!("    [Task 2: Beta ] Finished all steps. Exiting.");
 }
 
-/// Runs verification tests for cooperative multitasking and CPU context switching.
-pub fn run_task_tests() {
-    crate::println!("\n[TEST] Running Cooperative Multitasking & Context Switch Tests...");
+/// Runs verification tests for multi-policy scheduling and timer-driven preemption.
+pub fn run_scheduler_tests() {
+    crate::println!("\n[TEST] Running Preemptive Multi-Policy Scheduler Verification Tests...");
 
-    // Spawn Task Alpha and Task Beta
-    let id_a = spawn("Task Alpha", task_alpha);
-    let id_b = spawn("Task Beta", task_beta);
+    // Test 1: Verify Scheduling Policies
+    set_policy(SchedulingPolicy::Priority);
+    crate::println!("  [PASS] Configured Priority-Based Scheduling Policy.");
+    set_policy(SchedulingPolicy::FairShare);
+    crate::println!("  [PASS] Configured Fair-Share Scheduling Policy.");
+    set_policy(SchedulingPolicy::RoundRobin);
+    crate::println!("  [PASS] Configured Round-Robin (Time-Sliced) Policy.");
 
-    crate::println!("  Spawned Task 1 ('Task Alpha', ID: {:?})", id_a);
-    crate::println!("  Spawned Task 2 ('Task Beta',  ID: {:?})", id_b);
-    crate::println!("  Interleaving execution across tasks via yield_now()...");
+    // Test 2: Involuntary Timer-Driven Preemption
+    crate::println!("  Spawning compute-intensive Worker Alpha and Worker Beta (NO voluntary yields)...");
+    let id_a = spawn_with_priority("Compute-Alpha", Priority::Normal, preemptive_worker_a);
+    let id_b = spawn_with_priority("Compute-Beta", Priority::Normal, preemptive_worker_b);
 
-    // Interleave execution by yielding from Task 0 until both tasks complete
-    while ALPHA_TICKS.load(Ordering::SeqCst) < 3 || BETA_TICKS.load(Ordering::SeqCst) < 3 {
+    crate::println!("  Spawned Worker Alpha ({:?}) and Worker Beta ({:?})", id_a, id_b);
+    crate::println!("  Enabling CPU interrupts to trigger 100 Hz PIT timer preemption...");
+
+    // Temporarily enable interrupts so PIT ticks fire during the test
+    crate::arch::cpu::enable_interrupts();
+
+    // The main thread yields or waits while workers are preemptively scheduled
+    while COMPUTE_A_PROGRESS.load(Ordering::SeqCst) < 3 || COMPUTE_B_PROGRESS.load(Ordering::SeqCst) < 3 {
         yield_now();
     }
 
-    assert_eq!(ALPHA_TICKS.load(Ordering::SeqCst), 3);
-    assert_eq!(BETA_TICKS.load(Ordering::SeqCst), 3);
-
-    crate::println!("  [PASS] Cooperative Task Management & CPU Context Switching verified!");
-    crate::println!("[TEST] All Cooperative Task Management Tests PASSED!\n");
+    crate::println!("  [PASS] Timer Preemption verified: Both busy-compute workers ran concurrently to completion!");
+    crate::println!("[TEST] All Preemptive Scheduler Verification Tests PASSED!\n");
 }

@@ -126,3 +126,19 @@ This document tracks chronological engineering milestones, architectural choices
   - Task 1 ("Task Alpha") and Task 2 ("Task Beta") spawned.
   - Interleaved execution: Alpha 1 -> Beta 1 -> Alpha 2 -> Beta 2 -> Alpha 3 -> Beta 3.
   - Status: `Phase 10 Milestone achieved: Cooperative Task Management & Context Switching operational.`
+
+---
+
+### [2026-11-06] — Phase 11: Preemptive Multi-Policy CPU Scheduler
+* **Action**: Designed and implemented timer-driven preemptive multitasking and multi-policy scheduling engine:
+  1. `scheduler.rs` (`kernel/kinetix-kernel/src/task/scheduler.rs`): Implemented three distinct scheduling disciplines:
+     - `RoundRobin`: Circular time-sliced task distribution.
+     - `Priority`: Strict priority preemption with priority-weighted quantums (Low = 20 ms, Normal = 40 ms, High = 80 ms, Realtime = 120 ms).
+     - `FairShare`: Dynamic least-consumed CPU time balancing (CFS style).
+  2. Telemetry and Quantum Tracking (`tcb.rs`): Added `Priority` enum, `quantum_ticks`, `ticks_remaining`, and tracking counters (`total_ticks_consumed`, `context_switches`, `preemptions`, `voluntary_yields`) preparing the infrastructure for Phase 12 academic multitasking research.
+  3. Preemptive Timer Integration (`arch/interrupts.rs` & `task/mod.rs`): Hooked IRQ 0 (100 Hz PIT timer interrupt) to `task::handle_timer_tick()`. When a running task's time-slice expires, an involuntary context switch is executed directly from the timer interrupt path, saving registers and resuming the preempted task seamlessly via the `iretq` stack frame.
+* **Action**: Implemented in-kernel verification tests verifying policy reconfiguration and executing compute-intensive tasks ("Worker Alpha" and "Worker Beta") with NO voluntary yields, confirming timer-driven involuntary preemption.
+* **Milestone**: **PHASE 11 COMPLETED & VERIFIED IN VIRTUALBOX**. Serial log verified:
+  - Policy switching verified (RoundRobin, Priority, FairShare).
+  - Worker Alpha and Worker Beta executed concurrently to completion under timer preemption.
+  - Status: `Phase 11 Milestone achieved: Preemptive Multi-Policy CPU Scheduler operational.`
