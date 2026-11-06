@@ -21,7 +21,7 @@ static KERNEL_STACK: KernelStack = KernelStack([0; 64 * 1024]);
 /// - Argument passed in register `RDI`: pointer to immutable `BootInfo`.
 #[no_mangle]
 #[link_section = ".text._start"]
-pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
+pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
     // 1. Initialize Serial Diagnostics (COM1: 0x3F8)
     arch::serial::SERIAL1.lock().init();
 

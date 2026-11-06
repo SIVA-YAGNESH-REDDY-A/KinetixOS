@@ -2,29 +2,20 @@
 $ErrorActionPreference = "Stop"
 
 $vmName = "KinetixOS"
-$imgFile = "artifacts\boot-images\kinetix-os.img"
-$vdiFile = "artifacts\boot-images\kinetix-os.vdi"
-$serialLog = "$PSScriptRoot\..\..\artifacts\boot-images\serial.log"
+$repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
+$imgFile = "$repoRoot\artifacts\boot-images\kinetix-os.img"
+$vdiFile = "$repoRoot\artifacts\boot-images\kinetix-os.vdi"
+$serialLog = "$repoRoot\artifacts\boot-images\serial.log"
 
 # Locate VBoxManage
-$vboxManage = Get-Command VBoxManage -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-if (!$vboxManage) {
-    $candidates = @(
-        "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe",
-        "D:\VirtualBox\VBoxManage.exe",
-        "D:\Program Files\Oracle\VirtualBox\VBoxManage.exe"
-    )
-    foreach ($cand in $candidates) {
-        if (Test-Path $cand) {
-            $vboxManage = $cand
-            break
-        }
-    }
+$vboxManage = "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe"
+if (!(Test-Path $vboxManage)) {
+    $found = Get-Command VBoxManage -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    if ($found) { $vboxManage = $found }
 }
 
-if (!$vboxManage) {
+if (!(Test-Path $vboxManage)) {
     Write-Host "[ERROR] VBoxManage not found. Please ensure Oracle VirtualBox is installed." -ForegroundColor Red
-    Write-Host "Installer is available at: D:\VirtualBox-7.2.22-Win.exe" -ForegroundColor Yellow
     exit 1
 }
 
@@ -35,7 +26,13 @@ if (!(Test-Path $imgFile)) {
     exit 1
 }
 
-# 1. Convert raw image to VDI
+# 1. Close medium if already registered, then convert raw image to VDI
+$mediumList = & $vboxManage list hdds
+if ($mediumList -match [regex]::Escape($vdiFile)) {
+    & $vboxManage storageattach $vmName --storagectl "SATA" --port 0 --device 0 --type hdd --medium none 2>$null
+    & $vboxManage closemedium disk $vdiFile 2>$null
+}
+
 if (Test-Path $vdiFile) {
     Remove-Item -Force $vdiFile
 }
@@ -43,7 +40,7 @@ Write-Host "Converting raw image to VDI ($vdiFile)..." -ForegroundColor Cyan
 & $vboxManage convertfromraw $imgFile $vdiFile --format VDI
 
 # 2. Check if VM exists
-$vmList = & $vboxManage list vms
+$vmList = (& $vboxManage list vms | Out-String)
 if ($vmList -notmatch "`"$vmName`"") {
     Write-Host "Creating VirtualBox VM: $vmName..." -ForegroundColor Cyan
     & $vboxManage createvm --name $vmName --ostype "Other_64" --register

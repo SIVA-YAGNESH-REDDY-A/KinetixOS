@@ -104,6 +104,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut kfile = kernel_dir.create_file("KINETIX-KERNEL.ELF")?;
             let kbytes = fs::read(kpath)?;
             kfile.write_all(&kbytes)?;
+
+            // Also place a root-level copy for UEFI firmware implementations without multi-level path resolution
+            println!("[IMAGE BUILDER] Writing /KERNEL.ELF from {}", kpath);
+            let mut root_kfile = root.create_file("KERNEL.ELF")?;
+            root_kfile.write_all(&kbytes)?;
         }
     }
 

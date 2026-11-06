@@ -120,15 +120,39 @@ fn main() -> Status {
     };
 
     // 4. Read Kernel ELF File
-    let kernel_path = cstr16!(r"KINETIX\KERNEL\KINETIX-KERNEL.ELF");
-    serial_println!("[BOOT] Opening kernel image: KINETIX\\KERNEL\\KINETIX-KERNEL.ELF");
-
-    let file_handle = match root_dir.open(kernel_path, FileMode::Read, FileAttribute::empty()) {
-        Ok(handle) => handle,
-        Err(e) => {
-            serial_println!("[BOOT ERROR] Failed to open kernel file: {:?}", e);
+    serial_println!("[BOOT] Locating kernel binary...");
+    let file_handle = if let Ok(h) = root_dir.open(cstr16!("KERNEL.ELF"), FileMode::Read, FileAttribute::empty()) {
+        serial_println!("[BOOT] Found /KERNEL.ELF in root directory.");
+        h
+    } else if let Ok(kdir_handle) = root_dir.open(cstr16!("KINETIX"), FileMode::Read, FileAttribute::empty()) {
+        if let Some(mut kdir) = kdir_handle.into_directory() {
+            if let Ok(kernel_dir_handle) = kdir.open(cstr16!("KERNEL"), FileMode::Read, FileAttribute::empty()) {
+                if let Some(mut kernel_dir) = kernel_dir_handle.into_directory() {
+                    match kernel_dir.open(cstr16!("KINETIX-KERNEL.ELF"), FileMode::Read, FileAttribute::empty()) {
+                        Ok(h) => {
+                            serial_println!("[BOOT] Found /KINETIX/KERNEL/KINETIX-KERNEL.ELF via directory traversal.");
+                            h
+                        }
+                        Err(e) => {
+                            serial_println!("[BOOT ERROR] Failed to open KINETIX-KERNEL.ELF in KERNEL dir: {:?}", e);
+                            return Status::NOT_FOUND;
+                        }
+                    }
+                } else {
+                    serial_println!("[BOOT ERROR] KERNEL is not a directory!");
+                    return Status::NOT_FOUND;
+                }
+            } else {
+                serial_println!("[BOOT ERROR] Failed to open KERNEL directory!");
+                return Status::NOT_FOUND;
+            }
+        } else {
+            serial_println!("[BOOT ERROR] KINETIX is not a directory!");
             return Status::NOT_FOUND;
         }
+    } else {
+        serial_println!("[BOOT ERROR] Kernel binary not found!");
+        return Status::NOT_FOUND;
     };
 
     let mut kernel_file = match file_handle.into_regular_file() {
@@ -313,8 +337,8 @@ fn main() -> Status {
 
     serial_println!("[BOOT] BootServices terminated. Transferring execution to Kinetix Kernel at 0x{:X}...", entry_point);
 
-    // 11. Transfer Control to the Kinetix Kernel
-    let kernel_entry: extern "C" fn(&'static BootInfo) -> ! = unsafe {
+    // 11. Transfer Control to the Kinetix Kernel (System V AMD64 ABI)
+    let kernel_entry: extern "sysv64" fn(&'static BootInfo) -> ! = unsafe {
         core::mem::transmute(entry_point)
     };
 
