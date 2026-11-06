@@ -93,13 +93,20 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
 
         // 6. Execute Memory Verification Self-Tests
         memory::run_memory_tests();
+
+        // 7. Initialize CPU Architecture & Interrupt Infrastructure (Phase 8)
+        arch::init();
+
+        // 8. Execute Exception & Hardware Interrupt Verification Self-Tests
+        arch::run_interrupt_tests();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 7 Milestone achieved: Kernel Memory Management operational.");
+    println!("[KERNEL] Phase 8 Milestone achieved: CPU Interrupts & Exception Infrastructure operational.");
 
-    // Halt CPU loop waiting for interrupts
+    // Enable interrupts and enter low-power halt loop
+    arch::cpu::enable_interrupts();
     arch::cpu::halt_loop();
 }
 

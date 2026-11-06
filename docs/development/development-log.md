@@ -80,3 +80,20 @@ This document tracks chronological engineering milestones, architectural choices
   - Active CR3 root: `0x7EE01000`.
   - Kernel Heap available: 4096 KiB (4,194,304 bytes).
   - All tests `[PASS]`. Status: `Phase 7 Milestone achieved: Kernel Memory Management operational.`
+
+---
+
+### [2026-11-06] — Phase 8: CPU Interrupts & Exception Infrastructure
+* **Action**: Designed and implemented complete CPU interrupt and exception subsystem:
+  1. `gdt.rs` (`kernel/kinetix-kernel/src/arch/gdt.rs`): 64-bit Kernel Code (`0x08`), Kernel Data (`0x10`), and Task State Segment (`0x18`) with dedicated 16 KiB Double Fault IST stack (`DOUBLE_FAULT_STACK`). Loaded via `lgdt`, `ltr`, and far `retfq`.
+  2. `idt.rs` (`kernel/kinetix-kernel/src/arch/idt.rs`): 256-entry 64-bit Interrupt Descriptor Table loaded via `lidt`. Mapped all 32 x86_64 CPU exceptions (vector 8 `#DF` mapped to IST1), IRQ 0 (timer), and IRQ 1 (keyboard).
+  3. `pic.rs` (`kernel/kinetix-kernel/src/arch/pic.rs`): Dual 8259 PIC driver remapping hardware IRQs 0..15 to interrupt vectors 32..47.
+  4. `pit.rs` (`kernel/kinetix-kernel/src/arch/pit.rs`): 8254 PIT driver operating at 100 Hz (10 ms ticks) driving `TICKS` atomic counter for preemptive scheduling.
+  5. `interrupts.rs` (`kernel/kinetix-kernel/src/arch/interrupts.rs`): Low-level assembly entry stubs (`global_asm!`), `TrapFrame` register capture (RAX..R15, vector, error code, RIP, CS, RFLAGS, RSP, SS), and Rust dispatchers.
+* **Action**: Implemented in-kernel verification tests for software breakpoint exception (`int3`) and hardware PIT timer ticks (`sti` + `halt`).
+* **Milestone**: **PHASE 8 COMPLETED & VERIFIED IN VIRTUALBOX**. Serial log verified:
+  - GDT & TSS initialized and active.
+  - IDT initialized and loaded into CPU.
+  - Software breakpoint (`#BP`) caught at RIP `0x20304A` and execution safely resumed.
+  - Hardware timer interrupts active: delivered 10 ticks (100 ms) via IRQ 0.
+  - Status: `Phase 8 Milestone achieved: CPU Interrupts & Exception Infrastructure operational.`
