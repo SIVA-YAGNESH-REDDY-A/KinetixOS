@@ -5,6 +5,7 @@ extern crate alloc;
 
 mod arch;
 mod console;
+mod fs;
 mod memory;
 mod research;
 mod task;
@@ -100,27 +101,31 @@ pub extern "sysv64" fn _start(boot_info: &'static BootInfo) -> ! {
         // 6. Execute Memory Verification Self-Tests
         memory::run_memory_tests();
 
-        // 7. Initialize CPU Architecture & Interrupt Infrastructure (Phase 8)
+        // 7. Initialize In-Memory Boot Filesystem (Phase 13)
+        fs::init(boot_info);
+        fs::run_fs_tests();
+
+        // 8. Initialize CPU Architecture & Interrupt Infrastructure (Phase 8)
         arch::init();
 
-        // 8. Execute Exception & Hardware Interrupt Verification Self-Tests
+        // 9. Execute Exception & Hardware Interrupt Verification Self-Tests
         arch::run_interrupt_tests();
 
-        // 9. Execute Hardware Interaction Verification Self-Tests (Phase 9)
+        // 10. Execute Hardware Interaction Verification Self-Tests (Phase 9)
         console::run_console_tests();
         arch::keyboard::run_keyboard_tests();
 
-        // 10. Initialize Multitasking & Preemptive Multi-Policy Scheduler (Phases 10 & 11)
+        // 11. Initialize Multitasking & Preemptive Multi-Policy Scheduler (Phases 10 & 11)
         task::init();
         task::run_scheduler_tests();
 
-        // 11. Execute CPU Multitasking Academic Research Benchmarks (Phase 12)
+        // 12. Execute CPU Multitasking Academic Research Benchmarks (Phase 12)
         research::run_research_experiments();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 12 Milestone achieved: CPU Multitasking Academic Research complete.");
+    println!("[KERNEL] Phase 13 Milestone achieved: In-Memory Boot Filesystem (RamFS / ustar) operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();

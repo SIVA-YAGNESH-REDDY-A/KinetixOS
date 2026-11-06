@@ -295,6 +295,43 @@ fn main() -> Status {
         }
     }
 
+    // Stage BOOTFS.TAR if present
+    let bootfs_path = cstr16!(r"KINETIX\BOOTFS.TAR");
+    let bootfs_file = root_dir.open(bootfs_path, FileMode::Read, FileAttribute::empty())
+        .or_else(|_| root_dir.open(cstr16!(r"BOOTFS.TAR"), FileMode::Read, FileAttribute::empty()));
+    if let Ok(file_handle) = bootfs_file {
+        if let Some(mut bfile) = file_handle.into_regular_file() {
+            let mut bootfs_buf = Vec::new();
+            let mut chunk = [0u8; 8192];
+            while let Ok(n) = bfile.read(&mut chunk) {
+                if n == 0 { break; }
+                bootfs_buf.extend_from_slice(&chunk[..n]);
+            }
+            if !bootfs_buf.is_empty() {
+                let pages = (bootfs_buf.len() + 4095) / 4096;
+                if let Ok(bootfs_paddr) = boot::allocate_pages(AllocateType::AnyPages, MemoryType::LOADER_DATA, pages) {
+                    unsafe {
+                        let ptr = bootfs_paddr.as_ptr();
+                        core::ptr::copy_nonoverlapping(bootfs_buf.as_ptr(), ptr, bootfs_buf.len());
+                        let mut name = [0u8; 32];
+                        let bname = b"BOOTFS.TAR";
+                        name[..bname.len()].copy_from_slice(bname);
+                        let idx = BOOT_INFO.modules.count;
+                        if idx < kinetix_boot_protocol::MAX_MODULES {
+                            BOOT_INFO.modules.modules[idx] = kinetix_boot_protocol::ModuleDescriptor {
+                                physical_address: ptr as u64,
+                                size: bootfs_buf.len(),
+                                name,
+                            };
+                            BOOT_INFO.modules.count += 1;
+                            serial_println!("[BOOT] Staged module 'BOOTFS.TAR' at 0x{:X} ({} bytes)", ptr as u64, bootfs_buf.len());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Drop temporary vectors before exiting boot services
     drop(kernel_buffer);
     drop(root_dir);

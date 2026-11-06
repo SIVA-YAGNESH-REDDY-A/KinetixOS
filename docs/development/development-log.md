@@ -162,3 +162,24 @@ This document tracks chronological engineering milestones, architectural choices
   - Trial 4 (Mixed Heterogeneous, Priority): 487.5M cycles, 9 ticks, 51 switches, 4 preemptions, 20 yields, 49% fairness.
   - Trial 5 (Mixed Heterogeneous, Fair-Share): 479.9M cycles, 6 ticks, 44 switches, 1 preemption, 20 yields, 25% fairness.
   - Status: `Phase 12 Milestone achieved: CPU Multitasking Academic Research complete.`
+
+---
+
+### [2026-11-06] — Phase 13: In-Memory / Read-Only Boot Filesystem (tar / ustar)
+* **Action**: Designed and implemented the in-memory boot filesystem (RamFS) and Virtual Filesystem (VFS) abstraction:
+  1. `ustar.rs` (`kernel/kinetix-kernel/src/fs/ustar.rs`): Zero-copy POSIX ustar archive parser with 512-byte header parsing, octal number decoding, checksum mathematical validation, path normalization, and entry iteration.
+  2. `vfs.rs` (`kernel/kinetix-kernel/src/fs/vfs.rs`): In-memory RAM filesystem (`RamFs`) supporting hierarchical directory traversal (`list_dir()`), file metadata queries (`stat()`), existence checks (`exists()`), and direct byte slice opening (`open()`).
+  3. `fs/mod.rs` (`kernel/kinetix-kernel/src/fs/mod.rs`): Unified VFS dispatcher embedding compile-time archive (`EMBEDDED_BOOTFS` via `include_bytes!`) and dynamically overlaying bootloader-staged external modules (`BootInfo.modules`).
+  4. Tooling & Packaging:
+     - Configured `scripts/windows/build-kernel.ps1` to automatically package `artifacts/ramdisk/` into `kernel/kinetix-kernel/bootfs.tar`.
+     - Populated initial filesystem: `/bin/hello-world` (native ELF64 binary), `/etc/os-release`, `/etc/motd`, `/README.txt`.
+     - Updated `tools/kinetix-image-builder` and `bootloader/kinetix-bootloader` to stage `BOOTFS.TAR` and `HELLO-WORLD.ELF` into `BootInfo.modules`.
+* **Action**: Published architecture specification: `docs/kernel/filesystem-architecture.md`.
+* **Milestone**: **PHASE 13 COMPLETED & VERIFIED IN VIRTUALBOX**. Serial log verified:
+  - Staged module `BOOTFS.TAR` detected at `0x7D483000` (7680 bytes).
+  - RamFS root directory listing verified (3 top-level entries: `bin/`, `etc/`, `README.txt`).
+  - `stat('/etc/os-release')` verified (175 bytes, mode 0o666).
+  - Header block checksum verified.
+  - File reading verified (`/etc/os-release`, `/etc/motd`).
+  - Executable inspection: `/bin/hello-world` verified as valid ELF64 binary (1144 bytes, magic: `0x7F 'ELF'`).
+  - Status: `Phase 13 Milestone achieved: In-Memory Boot Filesystem (RamFS / ustar) operational.`

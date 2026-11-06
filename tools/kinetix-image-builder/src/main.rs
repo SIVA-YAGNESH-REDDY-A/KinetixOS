@@ -121,6 +121,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut afile = apps_dir.create_file(&filename)?;
             let abytes = fs::read(apath)?;
             afile.write_all(&abytes)?;
+
+            // Also write HELLO-WORLD.ELF if the name is HELLO-WORLD
+            if filename == "HELLO-WORLD" {
+                println!("[IMAGE BUILDER] Writing /KINETIX/APPS/HELLO-WORLD.ELF from {}", apath);
+                let mut elf_file = apps_dir.create_file("HELLO-WORLD.ELF")?;
+                elf_file.write_all(&abytes)?;
+            }
+        }
+    }
+
+    // Copy BOOTFS.TAR if present
+    let bootfs_tar_paths = [
+        "artifacts/boot-images/bootfs.tar",
+        "kernel/kinetix-kernel/bootfs.tar",
+    ];
+    for bpath in &bootfs_tar_paths {
+        if Path::new(bpath).exists() {
+            println!("[IMAGE BUILDER] Writing /KINETIX/BOOTFS.TAR from {}", bpath);
+            let mut bfile = kinetix_dir.create_file("BOOTFS.TAR")?;
+            let bbytes = fs::read(bpath)?;
+            bfile.write_all(&bbytes)?;
+
+            println!("[IMAGE BUILDER] Writing /BOOTFS.TAR from {}", bpath);
+            let mut root_bfile = root.create_file("BOOTFS.TAR")?;
+            root_bfile.write_all(&bbytes)?;
+            break;
         }
     }
 
