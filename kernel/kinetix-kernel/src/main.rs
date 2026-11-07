@@ -5,6 +5,7 @@ extern crate alloc;
 
 mod arch;
 mod canvas;
+mod cartridges;
 mod console;
 mod fs;
 mod loader;
@@ -164,11 +165,15 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
         // 18. Initialize Canvas Desktop Environment & Execute Compositor Verification Tests (Phase 19)
         canvas::init(boot_info.framebuffer);
         canvas::run_canvas_tests();
+
+        // 19. Launch Cartridge I (Scribe Notes Studio) & Run Verification Tests (Phase 20)
+        cartridges::scribe::run_scribe_tests();
+        canvas::compose_desktop();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 19 Milestone achieved: Canvas & Horizon (The Kinetix Desktop Environment) operational.");
+    println!("[KERNEL] Phase 20 Milestone achieved: Cartridge I (Scribe Notes Chamber) operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();

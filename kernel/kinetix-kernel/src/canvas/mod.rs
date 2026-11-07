@@ -39,6 +39,16 @@ pub fn init(fb: FramebufferInfo) {
     println!("[CANVAS] Pristine desktop surface composited to display.");
 }
 
+/// Re-composites the full desktop scene including open cartridge chambers.
+pub fn compose_desktop() {
+    let mut prism = PRISM.lock();
+    backdrop::render_backdrop(&mut prism);
+    HORIZON.lock().render(&mut prism);
+    BEACONS.lock().render(&mut prism, 512, 384);
+    crate::cartridges::scribe::SCRIBE.lock().render(&mut prism);
+    prism.blit_to_screen();
+}
+
 /// Executes Phase 19 verification tests for the Canvas and Horizon subsystem.
 pub fn run_canvas_tests() {
     println!("\n================================================================================");
