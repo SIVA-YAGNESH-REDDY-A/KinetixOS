@@ -66,7 +66,8 @@ if ($vmList -notmatch "`"$vmName`"") {
 & $vboxManage storageattach $vmName --storagectl "SATA" --port 0 --device 0 --type hdd --medium $vdiFile
 
 # 4. Start the VM
-Write-Host "Starting VirtualBox VM: $vmName..." -ForegroundColor Green
-& $vboxManage startvm $vmName
+Write-Host "Starting VirtualBox VM (GUI window): $vmName..." -ForegroundColor Green
+& $vboxManage startvm $vmName --type gui
 
-Write-Host "[OK] VM launched. Serial diagnostics logged to: $serialLog" -ForegroundColor Green
+Write-Host "[OK] VM launched in interactive GUI window." -ForegroundColor Green
+Write-Host "     Serial diagnostics logged to: $serialLog" -ForegroundColor Cyan

@@ -174,12 +174,15 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
         // 21. Execute Full System Integration & Laptop Regression Tests (Phase 22)
         pulses::router::run_integration_tests();
+        println!("[KERNEL] Phase 22 Milestone achieved: Full System Integration & Laptop Verification operational.");
+
+        // 22. Final Desktop Presentation: Composite Desktop & Draw Kinetic Reticle Cursor
         canvas::compose_desktop();
+        pulses::reticle::RETICLE.lock().init(boot_info.framebuffer);
+        pulses::reticle::RETICLE.lock().draw_at(512, 384);
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
-
-    println!("[KERNEL] Phase 22 Milestone achieved: Full System Integration & Laptop Verification operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();
