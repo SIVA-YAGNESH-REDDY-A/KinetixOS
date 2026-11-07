@@ -318,3 +318,17 @@ This document tracks chronological engineering milestones, architectural choices
   - Wall collision verified: running into boundary triggered `GameState::GameOver`.
   - Match reset verified: restored state to `Running` with clean score and initial 3 segments.
   - Status: `[KERNEL] Phase 21 Milestone achieved: Cartridge II (Ouroboros Snake Arena) operational.`
+
+## Phase 22: Full System Integration & Laptop Regression Verification — 2026-11-07
+- **Objective**: Execute comprehensive end-to-end multi-window integration, stress-testing, and regression verification inside Oracle VirtualBox 7.2 on the developer laptop, ensuring complete stability before flashing to physical USB in Phase 23.
+- **Architectural Implementation**:
+  - `pulses/router.rs`: Created `EventRouter` coordinating mouse click dispatch, window close events, Z-order focus switching (`WindowFocus::Desktop`, `WindowFocus::Scribe`, `WindowFocus::Ouroboros`), and keystroke routing.
+  - Implemented multi-window compositing in `canvas/mod.rs` allowing simultaneous coexistence of the procedural blue bloom backdrop, horizon dock, desktop beacons, Scribe notes window, and Ouroboros snake arcade window.
+  - `main.rs`: Integrated `pulses::router::run_integration_tests()`.
+- **Empirical Verification (Oracle VirtualBox 7.2)**:
+  - Beacon launch event verified: clicking Scribe icon at $(50, 60)$ launched Scribe and granted focus.
+  - Keyboard routing verified: typed 74 characters into Scribe note buffer via router.
+  - Multi-window coexistence verified: launched Ouroboros concurrently without display or memory corruption.
+  - Directional gaming key routing verified: steered snake via 'W' and 'A' keystrokes.
+  - Window close action verified: closed Scribe window cleanly with focus transferring to Ouroboros.
+  - Status: `[KERNEL] Phase 22 Milestone achieved: Full System Integration & Laptop Verification operational.`

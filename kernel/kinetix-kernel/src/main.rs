@@ -171,12 +171,15 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
         // 20. Launch Cartridge II (Ouroboros Arcade Arena) & Run Verification Tests (Phase 21)
         cartridges::ouroboros::run_ouroboros_tests();
+
+        // 21. Execute Full System Integration & Laptop Regression Tests (Phase 22)
+        pulses::router::run_integration_tests();
         canvas::compose_desktop();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 21 Milestone achieved: Cartridge II (Ouroboros Snake Arena) operational.");
+    println!("[KERNEL] Phase 22 Milestone achieved: Full System Integration & Laptop Verification operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();
