@@ -46,6 +46,7 @@ pub fn compose_desktop() {
     HORIZON.lock().render(&mut prism);
     BEACONS.lock().render(&mut prism, 512, 384);
     crate::cartridges::scribe::SCRIBE.lock().render(&mut prism);
+    crate::cartridges::ouroboros::OUROBOROS.lock().render(&mut prism);
     prism.blit_to_screen();
 }
 

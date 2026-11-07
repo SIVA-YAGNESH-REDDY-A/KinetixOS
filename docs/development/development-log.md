@@ -301,3 +301,20 @@ This document tracks chronological engineering milestones, architectural choices
   - Backspace deletion verified: deleted character and successfully replaced with `'!'`.
   - Close button `[X]` hit-testing verified: window closed cleanly and re-opened for active desktop workspace.
   - Status: `[KERNEL] Phase 20 Milestone achieved: Cartridge I (Scribe Notes Chamber) operational.`
+
+## Phase 21: Cartridge II — Ouroboros (Interactive Snake Arena) — 2026-11-07
+- **Objective**: Design, implement, and verify the native arcade gaming cartridge, Ouroboros Arena, featuring an arcade window chamber, 20×20 playing grid, serpentine body vector physics, directional control with 180° self-reversal protection, pseudo-random food spawning, score tracking, wall/self collision detection, game over modal overlay, and match reset.
+- **Architectural Implementation**:
+  - `cartridges/ouroboros.rs`: Implemented `OuroborosArena` within a 424×460 `FlowChamber` window positioned at $(300, 120)$. Created 20×20 grid (each cell 19×19 with 1px padding), serpentine body vector with lime head (`#4ADE80`) and emerald segments (`#22C55E`), ruby food orb (`#EF4444`), and LCG pseudo-random spawner.
+  - Implemented game dynamics: `change_direction` (with opposite-direction filtering), `tick` (wall/self collision testing, body extension, food consumption, tail trimming), `render` (grid, snake, food, status bar, and Game Over modal overlay), and `reset`.
+  - `canvas/mod.rs`: Updated `compose_desktop()` to composite the Ouroboros Arena onto the physical display surface.
+  - `main.rs`: Integrated `cartridges::ouroboros::run_ouroboros_tests()`.
+- **Empirical Verification (Oracle VirtualBox 7.2)**:
+  - Ouroboros arena launch verified at $(300, 120)$ [424×460].
+  - Initial snake state verified: 3 segments centered at $(10, 10)$, food placed at $(19, 8)$.
+  - Movement physics verified: stepped Up and Left cleanly.
+  - 180-degree turn rejection verified: instant Right turn while moving Left rejected.
+  - Food consumption verified: score incremented by 10 points and snake length expanded to 4.
+  - Wall collision verified: running into boundary triggered `GameState::GameOver`.
+  - Match reset verified: restored state to `Running` with clean score and initial 3 segments.
+  - Status: `[KERNEL] Phase 21 Milestone achieved: Cartridge II (Ouroboros Snake Arena) operational.`

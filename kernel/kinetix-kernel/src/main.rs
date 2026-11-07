@@ -168,12 +168,15 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
         // 19. Launch Cartridge I (Scribe Notes Studio) & Run Verification Tests (Phase 20)
         cartridges::scribe::run_scribe_tests();
+
+        // 20. Launch Cartridge II (Ouroboros Arcade Arena) & Run Verification Tests (Phase 21)
+        cartridges::ouroboros::run_ouroboros_tests();
         canvas::compose_desktop();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 20 Milestone achieved: Cartridge I (Scribe Notes Chamber) operational.");
+    println!("[KERNEL] Phase 21 Milestone achieved: Cartridge II (Ouroboros Snake Arena) operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();
