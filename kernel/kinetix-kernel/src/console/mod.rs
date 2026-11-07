@@ -81,6 +81,11 @@ impl FramebufferConsole {
         self.row = 0;
     }
 
+    /// Returns a copy of the current framebuffer metadata.
+    pub fn get_fb_info(&self) -> Option<FramebufferInfo> {
+        self.fb
+    }
+
     /// Sets foreground and background text colors.
     #[allow(dead_code)]
     pub fn set_colors(&mut self, fg: u32, bg: u32) {
@@ -292,6 +297,11 @@ const fn to_bgr(rgb: u32) -> u32 {
 }
 
 pub static FRAMEBUFFER_CONSOLE: Mutex<FramebufferConsole> = Mutex::new(FramebufferConsole::new());
+
+/// Returns a copy of the active framebuffer metadata if initialized.
+pub fn get_fb_info() -> Option<FramebufferInfo> {
+    FRAMEBUFFER_CONSOLE.lock().get_fb_info()
+}
 
 /// Dual diagnostic output: writes formatted text to both COM1 serial and Framebuffer console.
 pub fn _print(args: core::fmt::Arguments) {

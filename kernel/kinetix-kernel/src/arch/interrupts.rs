@@ -101,6 +101,12 @@ irq1:
     push 33
     jmp common_isr_stub
 
+.global irq12
+irq12:
+    push 0
+    push 44
+    jmp common_isr_stub
+
 .global isr_default
 isr_default:
     push 0
@@ -262,6 +268,13 @@ fn handle_irq(frame: &TrapFrame) {
             // IRQ 1: PS/2 Keyboard
             let scancode = unsafe { inb(0x60) };
             super::keyboard::on_interrupt(scancode);
+            unsafe {
+                PICS.lock().notify_end_of_interrupt(frame.vector as u8);
+            }
+        }
+        12 => {
+            // IRQ 12: Kinetic Pointer (PS/2 Mouse / Wireless Dongle)
+            crate::pulses::pointer::on_interrupt();
             unsafe {
                 PICS.lock().notify_end_of_interrupt(frame.vector as u8);
             }

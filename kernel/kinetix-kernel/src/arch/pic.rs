@@ -83,6 +83,23 @@ impl ChainedPics {
         }
     }
 
+    /// Unmasks a specific hardware IRQ line (0..15).
+    pub unsafe fn unmask(&self, irq: u8) {
+        if irq < 8 {
+            let mask = inb(PIC1_DATA);
+            outb(PIC1_DATA, mask & !(1 << irq));
+            io_wait();
+        } else if irq < 16 {
+            let mask = inb(PIC2_DATA);
+            outb(PIC2_DATA, mask & !(1 << (irq - 8)));
+            io_wait();
+            // Ensure Master PIC cascade line (IRQ 2) is unmasked
+            let master_mask = inb(PIC1_DATA);
+            outb(PIC1_DATA, master_mask & !(1 << 2));
+            io_wait();
+        }
+    }
+
     /// Disables the 8259 PIC completely by masking all IRQs.
     #[allow(dead_code)]
     pub unsafe fn disable(&self) {

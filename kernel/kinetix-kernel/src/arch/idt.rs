@@ -86,6 +86,7 @@ pub fn init() {
         fn isr24(); fn isr25(); fn isr26(); fn isr27(); fn isr28(); fn isr29(); fn isr30(); fn isr31();
         fn irq0(); // Vector 32: PIT Timer
         fn irq1(); // Vector 33: Keyboard
+        fn irq12(); // Vector 44: Kinetic Pointer (Mouse)
         fn isr_default();
     }
 
@@ -108,10 +109,13 @@ pub fn init() {
     // Configure Hardware IRQs
     idt.entries[32].set_handler(irq0 as *const () as usize as u64, 0); // IRQ 0: Timer
     idt.entries[33].set_handler(irq1 as *const () as usize as u64, 0); // IRQ 1: Keyboard
+    idt.entries[44].set_handler(irq12 as *const () as usize as u64, 0); // IRQ 12: Kinetic Pointer (Mouse)
 
     // Fill remaining interrupt gates with default handler
     for vec in 34..256 {
-        idt.entries[vec].set_handler(isr_default as *const () as usize as u64, 0);
+        if vec != 44 {
+            idt.entries[vec].set_handler(isr_default as *const () as usize as u64, 0);
+        }
     }
 
     // Load IDT

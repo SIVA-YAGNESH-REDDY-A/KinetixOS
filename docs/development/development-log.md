@@ -253,3 +253,19 @@ This document tracks chronological engineering milestones, architectural choices
   - `/bin/sysinfo`: Loaded in clean address space, verified CPL == 3, displayed complete system profile, terminated with exit status 0; 11 physical frames reclaimed.
   - `/bin/bench`: Executed trial division over 2,999 candidates with 6 cooperative yields, discovered 430 primes, confirmed prime sum checksum 593,823, terminated with exit status 0; 11 physical frames reclaimed.
   - Status: `[KERNEL] Phase 17 Milestone achieved: Native Demonstration Applications (hello-world, sysinfo, bench) operational.`
+
+## Phase 18: Pulses & Reticle (Universal Kinetic Pointer Subsystem) — 2026-11-07
+- **Objective**: Design, implement, and verify the kinetic pointer motion vector and software cursor subsystem supporting legacy USB emulation (Flipkart SmartBuy M500 2.4 GHz wireless USB dongle and laptop touchpads) and virtualized pointing devices via 8042 controller auxiliary port and IRQ 12.
+- **Architectural Implementation**:
+  - `arch/pic.rs`: Implemented `ChainedPics::unmask(irq)` supporting both Master and Slave PIC IRQ lines, unmasking IRQ 12 (Bit 4 of Slave PIC) and cascade IRQ 2.
+  - `arch/interrupts.rs` & `arch/idt.rs`: Added low-level assembly entry stub `irq12`, registered Vector 44 in IDT, and routed interrupt dispatch to `crate::pulses::pointer::on_interrupt()`.
+  - `pulses/reticle.rs`: Designed 12×19 arrow pointer sprite with 1-pixel dark outline (`#1A1A1A`) and white core (`#FFFFFF`). Implemented dirty-rectangle background backup and restoration in `Reticle::move_to`, guaranteeing zero screen tearing and zero flicker.
+  - `pulses/pointer.rs`: Configured 8042 PS/2 controller auxiliary port initialization (commands `0xA8`, `0x20`, `0x60`, `0xF6`, `0xF4`, `0xD4`), implemented 3-byte packet state machine with Bit 3 phase guard synchronization, overflow protection, and coordinate boundary clamping.
+  - `main.rs`: Integrated `pulses::init()` and `pulses::pointer::run_pointer_tests()`.
+- **Empirical Verification (Oracle VirtualBox 7.2)**:
+  - Initial pointer position verified at display center: `(512, 384)`.
+  - Motion pulse vector (+75, -50) with Left Click verified: updated coordinates to `(587, 334)` with `left_pressed == true`.
+  - Negative overflow clamping verified: clamped to `(0, 0)`.
+  - Positive overflow clamping verified: clamped to `(1012, 749)` with `right_pressed == true`.
+  - Reticle restoration to center verified: clean background pixel restoration with zero display flicker.
+  - Status: `[KERNEL] Phase 18 Milestone achieved: Pulses & Reticle (Universal Kinetic Pointer Subsystem) operational.`

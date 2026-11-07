@@ -8,6 +8,7 @@ mod console;
 mod fs;
 mod loader;
 mod memory;
+mod pulses;
 mod research;
 mod task;
 mod user;
@@ -154,11 +155,15 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
         // 16. Execute Native Demonstration Applications in Ring 3 (Phase 17)
         loader::run_demonstration_apps();
+
+        // 17. Initialize Kinetic Pointer & Execute Reticle Verification Self-Tests (Phase 18)
+        pulses::init(boot_info.framebuffer.width as usize, boot_info.framebuffer.height as usize);
+        pulses::pointer::run_pointer_tests();
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    println!("[KERNEL] Phase 17 Milestone achieved: Native Demonstration Applications (hello-world, sysinfo, bench) operational.");
+    println!("[KERNEL] Phase 18 Milestone achieved: Pulses & Reticle (Universal Kinetic Pointer Subsystem) operational.");
 
     // Enable interrupts and enter low-power halt loop
     arch::cpu::enable_interrupts();
