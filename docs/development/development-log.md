@@ -269,3 +269,21 @@ This document tracks chronological engineering milestones, architectural choices
   - Positive overflow clamping verified: clamped to `(1012, 749)` with `right_pressed == true`.
   - Reticle restoration to center verified: clean background pixel restoration with zero display flicker.
   - Status: `[KERNEL] Phase 18 Milestone achieved: Pulses & Reticle (Universal Kinetic Pointer Subsystem) operational.`
+
+## Phase 19: Canvas & Horizon (The Kinetix Desktop Environment) — 2026-11-07
+- **Objective**: Design, synthesize, and verify the Kinetix OS desktop graphical user interface, featuring a 32-bit off-screen double buffer (Prism), a procedurally synthesized blue bloom/wave backdrop, a bottom taskbar dock (Horizon) with live chronometer and Kinetix spark emblem, interactive desktop Cartridge beacons (Scribe, Ouroboros, Telemetry), and movable Flow chamber window frames.
+- **Architectural Implementation**:
+  - `memory/heap.rs`: Expanded primary kernel heap from 4 MiB to 16 MiB (`0x0040_0000`..`0x0140_0000`) to comfortably accommodate the 3 MiB off-screen backbuffer and window surfaces.
+  - `canvas/prism.rs`: Created `PrismSurface` maintaining a 1024×768 32-bit backbuffer (3,145,728 bytes) with primitives: `fill_rect`, `draw_rect_outline`, `draw_char`, `draw_text`, automatic BGR/RGB color translation, and full-screen contiguous hardware blit (`blit_to_screen`).
+  - `canvas/backdrop.rs`: Implemented procedural blue bloom backdrop generation using integer fixed-point trigonometric harmonics (`SIN_LUT`), rendering smooth sky gradient transitions and central flowing blue petal ribbons without external image files.
+  - `canvas/horizon.rs`: Implemented the 44-pixel bottom dock ($Y = 724..768$) with Kinetix diamond spark logo, search quick-launch plate, and live formatted chronometer uptime telemetry.
+  - `canvas/beacons.rs`: Implemented interactive desktop icons (`Scribe`, `Ouroboros`, `Telemetry`) with custom 32×32 emblems, hover glass illumination (`#1E3A5F`), and hit testing.
+  - `canvas/chamber.rs`: Created `FlowChamber` draggable window frame primitives with title bar header, crimson red close button (`[X]`), and drag bounds.
+  - `main.rs`: Integrated `canvas::init()` and `canvas::run_canvas_tests()`.
+- **Empirical Verification (Oracle VirtualBox 7.2)**:
+  - Prism double buffer verified: 1024×768×4 (3,145,728 bytes).
+  - Procedural backdrop verified: distinct non-zero sky and bloom petal pixels confirmed.
+  - Horizon dock verified at $Y=724..768$ with Kinetix spark emblem and live chronometer.
+  - Desktop beacons hit-testing verified for all 3 cartridges (Scribe, Ouroboros, Telemetry).
+  - Flow chamber window geometry, title header, and close button hit testing verified.
+  - Status: `[KERNEL] Phase 19 Milestone achieved: Canvas & Horizon (The Kinetix Desktop Environment) operational.`

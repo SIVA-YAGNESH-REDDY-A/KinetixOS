@@ -10,8 +10,8 @@ use spin::Mutex;
 /// Starting physical/virtual address of the primary kernel heap (4 MiB).
 pub const HEAP_START: usize = 0x0040_0000;
 
-/// Total size of the primary kernel heap: 4 MiB (4,194,304 bytes).
-pub const HEAP_SIZE: usize = 4 * 1024 * 1024;
+/// Total size of the primary kernel heap: 16 MiB (16,777,216 bytes).
+pub const HEAP_SIZE: usize = 16 * 1024 * 1024;
 
 /// Header for each free memory block in the intrusive linked list.
 struct ListNode {
