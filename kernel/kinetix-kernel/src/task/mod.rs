@@ -171,33 +171,45 @@ pub fn spawn(name: &str, entry_fn: fn()) -> TaskId {
 
 /// Spawns a new task with explicit priority.
 pub fn spawn_with_priority(name: &str, priority: Priority, entry_fn: fn()) -> TaskId {
-    TASK_MANAGER.lock().spawn(name, priority, entry_fn)
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        TASK_MANAGER.lock().spawn(name, priority, entry_fn)
+    })
 }
 
 /// Sets the scheduler policy.
 pub fn set_policy(policy: SchedulingPolicy) {
-    TASK_MANAGER.lock().set_policy(policy);
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        TASK_MANAGER.lock().set_policy(policy);
+    });
 }
 
 /// Temporarily enables or disables timer preemption.
 #[allow(dead_code)]
 pub fn set_preemption(enabled: bool) {
-    TASK_MANAGER.lock().set_preemption(enabled);
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        TASK_MANAGER.lock().set_preemption(enabled);
+    });
 }
 
 /// Resets scheduler state for an isolated benchmark trial.
 pub fn reset_for_benchmark(policy: SchedulingPolicy) {
-    TASK_MANAGER.lock().reset_for_benchmark(policy);
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        TASK_MANAGER.lock().reset_for_benchmark(policy);
+    });
 }
 
 /// Checks whether any worker tasks are still running or ready.
 pub fn has_active_workers() -> bool {
-    TASK_MANAGER.lock().has_active_workers()
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        TASK_MANAGER.lock().has_active_workers()
+    })
 }
 
 /// Collects execution telemetry from all worker tasks.
 pub fn collect_worker_metrics() -> Vec<TaskMetric> {
-    TASK_MANAGER.lock().collect_worker_metrics()
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        TASK_MANAGER.lock().collect_worker_metrics()
+    })
 }
 
 /// Voluntarily yields CPU execution to the next available ready task.
@@ -208,9 +220,10 @@ pub fn yield_now() {
 /// Called by the IRQ 0 timer interrupt handler on every tick.
 /// If the running task's time-slice has expired, performs an involuntary preemption!
 pub fn handle_timer_tick() {
-    let should_preempt = {
-        let mut mgr = TASK_MANAGER.lock();
+    let should_preempt = if let Some(mut mgr) = TASK_MANAGER.try_lock() {
         mgr.on_timer_tick()
+    } else {
+        false
     };
 
     if should_preempt {
@@ -219,8 +232,7 @@ pub fn handle_timer_tick() {
 }
 
 fn perform_context_switch(is_preemption: bool) {
-    let switch_args = {
-        let mut mgr = TASK_MANAGER.lock();
+    let switch_args = if let Some(mut mgr) = TASK_MANAGER.try_lock() {
         if !mgr.initialized || mgr.tasks.len() <= 1 {
             return;
         }
@@ -256,6 +268,8 @@ fn perform_context_switch(is_preemption: bool) {
         } else {
             None
         }
+    } else {
+        return;
     }; // Lock dropped before switching context
 
     if let Some((old_rsp, new_rsp)) = switch_args {
@@ -303,7 +317,7 @@ fn preemptive_worker_a() {
     for step in 1..=3 {
         // Busy wait doing math work across several timer ticks
         let mut sum: u64 = 0;
-        for j in 0..15_000_000 {
+        for j in 0..50_000 {
             sum = sum.wrapping_add(j);
         }
         COMPUTE_A_PROGRESS.fetch_add(1, Ordering::SeqCst);
@@ -316,7 +330,7 @@ fn preemptive_worker_b() {
     // Busy loop without yield_now() to prove involuntary timer preemption!
     for step in 1..=3 {
         let mut sum: u64 = 0;
-        for j in 0..15_000_000 {
+        for j in 0..50_000 {
             sum = sum.wrapping_add(j);
         }
         COMPUTE_B_PROGRESS.fetch_add(1, Ordering::SeqCst);

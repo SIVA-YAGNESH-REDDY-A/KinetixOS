@@ -143,6 +143,7 @@ fn display_telemetry_report(results: &[BenchmarkResult]) {
             SchedulingPolicy::RoundRobin => "RoundRobin ",
             SchedulingPolicy::Priority =>   "Priority   ",
             SchedulingPolicy::FairShare =>  "FairShare  ",
+            SchedulingPolicy::AffinityAware => "Affinity   ",
         };
 
         let workload_str = match r.workload_name {

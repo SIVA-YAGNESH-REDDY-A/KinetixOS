@@ -1,8 +1,9 @@
 mod gpt;
+mod iso;
 
 use std::env;
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::path::Path;
 
 use fatfs::{format_volume, FileSystem, FormatVolumeOptions, FsOptions};
@@ -165,5 +166,64 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("[IMAGE BUILDER] Successfully created bootable UEFI image: {}", output_img);
+
+    // 5. Also build compact 34 MiB FAT32 ESP and package into UEFI Bootable ISO (.iso)
+    let iso_path = Path::new(output_img)
+        .with_extension("iso")
+        .to_string_lossy()
+        .into_owned();
+    let esp_iso_size: usize = 16 * 1024 * 1024; // 16 MiB FAT16 UEFI ESP (32768 x 512B sectors)
+    let mut esp_buf = vec![0u8; esp_iso_size];
+    {
+        let mut cursor = Cursor::new(&mut esp_buf[..]);
+        let mut buf_stream = fscommon::BufStream::new(&mut cursor);
+        format_volume(
+            &mut buf_stream,
+            FormatVolumeOptions::new()
+                .volume_label(*b"KINETIX_OS ")
+                .fat_type(fatfs::FatType::Fat16),
+        )?;
+        let iso_fs = FileSystem::new(buf_stream, FsOptions::new())?;
+        let iso_root = iso_fs.root_dir();
+        iso_root.create_dir("EFI")?;
+        let efi_d = iso_root.open_dir("EFI")?;
+        efi_d.create_dir("BOOT")?;
+        let boot_d = efi_d.open_dir("BOOT")?;
+        boot_d.create_file("BOOTX64.EFI")?.write_all(&fs::read(efi_path)?)?;
+
+        iso_root.create_dir("KINETIX")?;
+        let k_d = iso_root.open_dir("KINETIX")?;
+        k_d.create_dir("KERNEL")?;
+        k_d.create_dir("APPS")?;
+        if let Some(kpath) = kernel_path {
+            if Path::new(kpath).exists() {
+                let kbytes = fs::read(kpath)?;
+                k_d.open_dir("KERNEL")?.create_file("KINETIX-KERNEL.ELF")?.write_all(&kbytes)?;
+                iso_root.create_file("KERNEL.ELF")?.write_all(&kbytes)?;
+            }
+        }
+        if let Some(apath) = app_path {
+            if Path::new(apath).exists() {
+                let apps_d = k_d.open_dir("APPS")?;
+                let abytes = fs::read(apath)?;
+                apps_d.create_file("HELLO-WORLD.ELF")?.write_all(&abytes)?;
+                if Path::new("target/x86_64-unknown-none/release/sysinfo").exists() {
+                    apps_d.create_file("SYSINFO.ELF")?.write_all(&fs::read("target/x86_64-unknown-none/release/sysinfo")?)?;
+                }
+                if Path::new("target/x86_64-unknown-none/release/bench").exists() {
+                    apps_d.create_file("BENCH.ELF")?.write_all(&fs::read("target/x86_64-unknown-none/release/bench")?)?;
+                }
+            }
+        }
+        for bpath in &bootfs_tar_paths {
+            if Path::new(bpath).exists() {
+                let bbytes = fs::read(bpath)?;
+                k_d.create_file("BOOTFS.TAR")?.write_all(&bbytes)?;
+                iso_root.create_file("BOOTFS.TAR")?.write_all(&bbytes)?;
+                break;
+            }
+        }
+    }
+    iso::write_uefi_iso(&iso_path, &esp_buf)?;
     Ok(())
 }

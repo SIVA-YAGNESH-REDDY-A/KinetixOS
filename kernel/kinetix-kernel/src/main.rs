@@ -12,6 +12,7 @@ mod loader;
 mod memory;
 mod pulses;
 mod research;
+mod storage;
 mod task;
 mod user;
 mod syscall;
@@ -119,10 +120,12 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
         }
 
         // 5. Initialize Memory Management Subsystem (Phase 7)
+        arch::hwinfo::HW_INFO.lock().boot_profile.t_kernel_start = arch::cpu::rdtsc();
         memory::init(boot_info);
 
         // 6. Execute Memory Verification Self-Tests
         memory::run_memory_tests();
+        arch::hwinfo::HW_INFO.lock().boot_profile.t_memory_done = arch::cpu::rdtsc();
 
         // 7. Initialize In-Memory Boot Filesystem (Phase 13)
         fs::init(boot_info);
@@ -130,10 +133,14 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
         // 8. Execute Native Application Loader Verification Self-Tests (Phase 14)
         loader::run_loader_tests();
+        arch::hwinfo::HW_INFO.lock().boot_profile.t_fs_done = arch::cpu::rdtsc();
 
         // 9. Initialize CPU Architecture, Interrupt Infrastructure, and System Calls (Phases 8 & 16)
         arch::init();
+        storage::init();
+        fs::ntfs::init();
         syscall::init();
+        arch::hwinfo::HW_INFO.lock().boot_profile.t_arch_done = arch::cpu::rdtsc();
 
         // 10. Execute Exception & Hardware Interrupt Verification Self-Tests
         arch::run_interrupt_tests();
@@ -179,14 +186,18 @@ extern "sysv64" fn kernel_main(boot_info: &'static BootInfo) -> ! {
         // 22. Final Desktop Presentation: Composite Desktop & Draw Kinetic Reticle Cursor
         canvas::compose_desktop();
         pulses::reticle::RETICLE.lock().init(boot_info.framebuffer);
-        pulses::reticle::RETICLE.lock().draw_at(512, 384);
+        let (cw, ch) = {
+            let p = canvas::PRISM.lock();
+            (p.width / 2, p.height / 2)
+        };
+        pulses::reticle::RETICLE.lock().draw_at(cw, ch);
+        arch::hwinfo::calibrate_tsc_and_finalize_boot(arch::cpu::rdtsc());
     } else {
         println!("[KERNEL WARNING] BootInfo signature invalid or version mismatch!");
     }
 
-    // Enable interrupts and enter low-power halt loop
-    arch::cpu::enable_interrupts();
-    arch::cpu::halt_loop();
+    // Launch continuous interactive executive loop (Dragging, Windows, Snake, Scribe, Shutdown)
+    canvas::run_desktop_executive_loop();
 }
 
 #[panic_handler]

@@ -2,11 +2,15 @@
 
 pub mod cpu;
 pub mod gdt;
+pub mod hwinfo;
 pub mod idt;
 pub mod interrupts;
 pub mod keyboard;
+pub mod net;
 pub mod pic;
 pub mod pit;
+pub mod power;
+pub mod rtc;
 pub mod serial;
 
 use crate::println;
@@ -32,6 +36,15 @@ pub fn init() {
     unsafe {
         pit::init(100);
     }
+
+    println!("[ARCH] Probing Hardware Compatibility (CPUID, PCIe GPU/SSD/NIC, RTC)...");
+    hwinfo::init();
+    net::init();
+    let dt = rtc::read_datetime();
+    println!(
+        "[RTC] Synced Hardware Clock: {:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second
+    );
 
     println!("[ARCH] CPU & Interrupt Infrastructure initialized successfully.");
 }

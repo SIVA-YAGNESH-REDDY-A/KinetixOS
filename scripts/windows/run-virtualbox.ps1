@@ -46,6 +46,9 @@ if (Test-Path $vdiFile) {
 }
 Write-Host "Converting raw image to VDI ($vdiFile)..." -ForegroundColor Cyan
 & $vboxManage convertfromraw $imgFile $vdiFile --format VDI
+# Restore fixed UUID expected by KinetixOS.vbox to avoid UUID mismatch errors
+cmd /c "`"$vboxManage`" internalcommands sethduuid `"$vdiFile`" `"09841583-70b8-49bc-91f4-83bc76bbe6e3`" >nul 2>&1"
+cmd /c "`"$vboxManage`" modifyvm $vmName --usbxhci on >nul 2>&1"
 
 # 2. Check if VM exists
 $vmList = (& $vboxManage list vms | Out-String)
@@ -65,9 +68,6 @@ if ($vmList -notmatch "`"$vmName`"") {
 # 3. Attach current VDI disk
 & $vboxManage storageattach $vmName --storagectl "SATA" --port 0 --device 0 --type hdd --medium $vdiFile
 
-# 4. Start the VM
-Write-Host "Starting VirtualBox VM (GUI window): $vmName..." -ForegroundColor Green
-& $vboxManage startvm $vmName --type gui
-
-Write-Host "[OK] VM launched in interactive GUI window." -ForegroundColor Green
-Write-Host "     Serial diagnostics logged to: $serialLog" -ForegroundColor Cyan
+Write-Host "[OK] Virtual disk updated and attached to '$vmName'." -ForegroundColor Green
+Write-Host "     Now click the green 'Start' button in your VirtualBox Manager window!" -ForegroundColor Yellow
+Write-Host "     Serial diagnostics will be logged to: $serialLog" -ForegroundColor Cyan

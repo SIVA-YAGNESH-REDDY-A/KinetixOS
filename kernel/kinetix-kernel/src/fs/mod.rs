@@ -4,6 +4,7 @@
 //! POSIX ustar archives. Powers early system configuration, metadata discovery,
 //! and native user executable loading.
 
+pub mod ntfs;
 pub mod ustar;
 pub mod vfs;
 
@@ -61,8 +62,276 @@ pub fn init(boot_info: &'static BootInfo) {
     crate::println!("[FS] In-memory boot filesystem initialized successfully.");
 }
 
+use alloc::format;
+use alloc::string::{String, ToString};
+
+#[derive(Debug, Clone)]
+pub struct DynamicFile {
+    pub path: String, // e.g. "K:\Kinetix_Notes.txt", "D:\host_readiness.log"
+    pub content: Vec<u8>,
+    pub is_dir: bool,
+    pub modified_timestamp: u64,
+}
+
+pub static DYNAMIC_FILES: Mutex<Option<Vec<DynamicFile>>> = Mutex::new(None);
+
+fn ensure_dynamic_files(guard: &mut Option<Vec<DynamicFile>>) {
+    if guard.is_none() {
+        let mut files = Vec::new();
+        // K:\ initial files
+        files.push(DynamicFile {
+            path: String::from("K:\\System Volume Information"),
+            content: Vec::new(),
+            is_dir: true,
+            modified_timestamp: 0,
+        });
+        files.push(DynamicFile {
+            path: String::from("K:\\Documents"),
+            content: Vec::new(),
+            is_dir: true,
+            modified_timestamp: 0,
+        });
+        let k_notes = b"# KinetixOS Sovereign System Notes\n\nVolume: KinetixDrive (K:) NTFS Partition\nAuthor: Siva Yagnesh Reddy A (USN: 25BTRCL255)\n\nKernel: x86_64 Freestanding Rust (no_std)\nFilesystem: Native NTFS Driver Active\n\nType here to compose and edit documents...\n";
+        files.push(DynamicFile {
+            path: String::from("K:\\Kinetix_Notes.txt"),
+            content: k_notes.to_vec(),
+            is_dir: false,
+            modified_timestamp: 0,
+        });
+        files.push(DynamicFile {
+            path: String::from("K:\\Research_Writeup.docx"),
+            content: alloc::vec![0u8; 24576],
+            is_dir: false,
+            modified_timestamp: 0,
+        });
+
+        // D:\ initial files
+        files.push(DynamicFile {
+            path: String::from("D:\\System Volume Information"),
+            content: Vec::new(),
+            is_dir: true,
+            modified_timestamp: 0,
+        });
+        files.push(DynamicFile {
+            path: String::from("D:\\Projects"),
+            content: Vec::new(),
+            is_dir: true,
+            modified_timestamp: 0,
+        });
+        files.push(DynamicFile {
+            path: String::from("D:\\Backup"),
+            content: Vec::new(),
+            is_dir: true,
+            modified_timestamp: 0,
+        });
+        let d_log = b"KinetixOS Host Storage Bridge Operational\nVolume: D:\\ (245 GB NTFS)\nHealth: Clean & Mounted\nPartition Type: GPT NTFS\nAccess Mode: Active\n";
+        files.push(DynamicFile {
+            path: String::from("D:\\host_readiness.log"),
+            content: d_log.to_vec(),
+            is_dir: false,
+            modified_timestamp: 0,
+        });
+        let d_notes = b"Local Storage (D:) Notes\nHost storage partition mounted inside KinetixOS.\n";
+        files.push(DynamicFile {
+            path: String::from("D:\\shared_notes.txt"),
+            content: d_notes.to_vec(),
+            is_dir: false,
+            modified_timestamp: 0,
+        });
+
+        *guard = Some(files);
+    }
+}
+
+pub fn normalize_path_str(raw: &str) -> String {
+    let t = raw.trim();
+    if t.starts_with("K:") || t.starts_with("k:") {
+        let rest = t[2..].trim_start_matches('\\').trim_start_matches('/');
+        format!("K:\\{}", rest)
+    } else if t.starts_with("D:") || t.starts_with("d:") {
+        let rest = t[2..].trim_start_matches('\\').trim_start_matches('/');
+        format!("D:\\{}", rest)
+    } else if t.starts_with('/') {
+        t.to_string()
+    } else {
+        format!("K:\\{}", t.trim_start_matches('\\'))
+    }
+}
+
+/// Writes or creates a file dynamically in the sovereign filesystem.
+pub fn write_file(path: &str, data: &[u8]) -> bool {
+    let norm = normalize_path_str(path);
+    let mut guard = DYNAMIC_FILES.lock();
+    ensure_dynamic_files(&mut guard);
+    let files = guard.as_mut().unwrap();
+
+    let mut found = false;
+    for file in files.iter_mut() {
+        if file.path.eq_ignore_ascii_case(&norm) {
+            file.content = data.to_vec();
+            file.is_dir = false;
+            file.modified_timestamp = crate::arch::pit::get_ticks();
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        files.push(DynamicFile {
+            path: norm.clone(),
+            content: data.to_vec(),
+            is_dir: false,
+            modified_timestamp: crate::arch::pit::get_ticks(),
+        });
+    }
+
+    // Sync entry into NTFS volume metadata
+    let file_name = norm.rsplit('\\').next().unwrap_or(&norm);
+    if norm.starts_with("K:") {
+        let mut kd = ntfs::KINETIX_DRIVE.lock();
+        if let Some(ref mut vol) = *kd {
+            if let Some(existing) = vol.root_entries.iter_mut().find(|e| e.name.eq_ignore_ascii_case(file_name)) {
+                existing.size = data.len() as u64;
+            } else {
+                vol.root_entries.push(ntfs::NtfsDirEntry {
+                    name: String::from(file_name),
+                    size: data.len() as u64,
+                    is_dir: false,
+                    mft_record_num: 50 + vol.root_entries.len() as u64,
+                    modified_timestamp: 0,
+                });
+            }
+        }
+    } else if norm.starts_with("D:") {
+        let mut dd = ntfs::D_DRIVE.lock();
+        if let Some(ref mut vol) = *dd {
+            if let Some(existing) = vol.root_entries.iter_mut().find(|e| e.name.eq_ignore_ascii_case(file_name)) {
+                existing.size = data.len() as u64;
+            } else {
+                vol.root_entries.push(ntfs::NtfsDirEntry {
+                    name: String::from(file_name),
+                    size: data.len() as u64,
+                    is_dir: false,
+                    mft_record_num: 50 + vol.root_entries.len() as u64,
+                    modified_timestamp: 0,
+                });
+            }
+        }
+    }
+
+    true
+}
+
+/// Reads a file's contents from dynamic storage or RamFS.
+pub fn read_file(path: &str) -> Option<Vec<u8>> {
+    let norm = normalize_path_str(path);
+    {
+        let mut guard = DYNAMIC_FILES.lock();
+        ensure_dynamic_files(&mut guard);
+        if let Some(ref files) = *guard {
+            for file in files {
+                if file.path.eq_ignore_ascii_case(&norm) {
+                    return Some(file.content.clone());
+                }
+            }
+        }
+    }
+    if let Some(bytes) = open(path) {
+        return Some(bytes.to_vec());
+    }
+    None
+}
+
+/// Creates a new directory in the sovereign filesystem.
+pub fn create_dir(path: &str) -> bool {
+    let norm = normalize_path_str(path);
+    let mut guard = DYNAMIC_FILES.lock();
+    ensure_dynamic_files(&mut guard);
+    let files = guard.as_mut().unwrap();
+
+    for file in files.iter() {
+        if file.path.eq_ignore_ascii_case(&norm) {
+            return false;
+        }
+    }
+    files.push(DynamicFile {
+        path: norm.clone(),
+        content: Vec::new(),
+        is_dir: true,
+        modified_timestamp: crate::arch::pit::get_ticks(),
+    });
+
+    let dir_name = norm.rsplit('\\').next().unwrap_or(&norm);
+    if norm.starts_with("K:") {
+        let mut kd = ntfs::KINETIX_DRIVE.lock();
+        if let Some(ref mut vol) = *kd {
+            vol.root_entries.push(ntfs::NtfsDirEntry {
+                name: String::from(dir_name),
+                size: 0,
+                is_dir: true,
+                mft_record_num: 50 + vol.root_entries.len() as u64,
+                modified_timestamp: 0,
+            });
+        }
+    } else if norm.starts_with("D:") {
+        let mut dd = ntfs::D_DRIVE.lock();
+        if let Some(ref mut vol) = *dd {
+            vol.root_entries.push(ntfs::NtfsDirEntry {
+                name: String::from(dir_name),
+                size: 0,
+                is_dir: true,
+                mft_record_num: 50 + vol.root_entries.len() as u64,
+                modified_timestamp: 0,
+            });
+        }
+    }
+    true
+}
+
+/// Deletes a file from dynamic storage.
+pub fn delete_file(path: &str) -> bool {
+    let norm = normalize_path_str(path);
+    let mut guard = DYNAMIC_FILES.lock();
+    ensure_dynamic_files(&mut guard);
+    let files = guard.as_mut().unwrap();
+
+    let mut removed = false;
+    if let Some(pos) = files.iter().position(|f| f.path.eq_ignore_ascii_case(&norm)) {
+        files.remove(pos);
+        removed = true;
+    }
+
+    let file_name = norm.rsplit('\\').next().unwrap_or(&norm);
+    if norm.starts_with("K:") {
+        let mut kd = ntfs::KINETIX_DRIVE.lock();
+        if let Some(ref mut vol) = *kd {
+            if let Some(pos) = vol.root_entries.iter().position(|e| e.name.eq_ignore_ascii_case(file_name)) {
+                vol.root_entries.remove(pos);
+            }
+        }
+    } else if norm.starts_with("D:") {
+        let mut dd = ntfs::D_DRIVE.lock();
+        if let Some(ref mut vol) = *dd {
+            if let Some(pos) = vol.root_entries.iter().position(|e| e.name.eq_ignore_ascii_case(file_name)) {
+                vol.root_entries.remove(pos);
+            }
+        }
+    }
+
+    removed
+}
+
 /// Tests whether a file or directory exists.
 pub fn exists(path: &str) -> bool {
+    let norm = normalize_path_str(path);
+    {
+        let mut guard = DYNAMIC_FILES.lock();
+        ensure_dynamic_files(&mut guard);
+        if let Some(ref files) = *guard {
+            if files.iter().any(|f| f.path.eq_ignore_ascii_case(&norm)) {
+                return true;
+            }
+        }
+    }
     let guard = VFS.lock();
     if let Some(ref fs) = *guard {
         fs.exists(path)
@@ -90,6 +359,47 @@ pub fn read(path: &str) -> Option<&'static [u8]> {
 
 /// Lists all directory entries within `dir_path`.
 pub fn list_dir(path: &str) -> Vec<DirEntry> {
+    let p = path.trim();
+    if p.starts_with("K:") || p.starts_with("k:") || p.starts_with("/k") || p.starts_with("/K") {
+        let mut guard = DYNAMIC_FILES.lock();
+        ensure_dynamic_files(&mut guard);
+        if let Some(ref files) = *guard {
+            let mut entries = Vec::new();
+            for item in files {
+                if item.path.starts_with("K:\\") || item.path.starts_with("k:\\") {
+                    let name = item.path[3..].trim_matches('\\');
+                    if !name.is_empty() && !name.contains('\\') {
+                        entries.push(DirEntry {
+                            name: String::from(name),
+                            size: item.content.len(),
+                            is_dir: item.is_dir,
+                        });
+                    }
+                }
+            }
+            return entries;
+        }
+    } else if p.starts_with("D:") || p.starts_with("d:") || p.starts_with("/d") || p.starts_with("/D") {
+        let mut guard = DYNAMIC_FILES.lock();
+        ensure_dynamic_files(&mut guard);
+        if let Some(ref files) = *guard {
+            let mut entries = Vec::new();
+            for item in files {
+                if item.path.starts_with("D:\\") || item.path.starts_with("d:\\") {
+                    let name = item.path[3..].trim_matches('\\');
+                    if !name.is_empty() && !name.contains('\\') {
+                        entries.push(DirEntry {
+                            name: String::from(name),
+                            size: item.content.len(),
+                            is_dir: item.is_dir,
+                        });
+                    }
+                }
+            }
+            return entries;
+        }
+    }
+
     let guard = VFS.lock();
     if let Some(ref fs) = *guard {
         fs.list_dir(path)

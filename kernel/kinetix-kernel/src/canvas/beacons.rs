@@ -7,9 +7,13 @@ use super::prism::PrismSurface;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BeaconId {
+    KinetixPC,
+    Terminal,
     Scribe,
-    Ouroboros,
     Telemetry,
+    SpeedTest,
+    Ouroboros,
+    Vault,
 }
 
 pub struct CartridgeBeacon {
@@ -29,7 +33,7 @@ impl CartridgeBeacon {
             x,
             y,
             width: 80,
-            height: 84,
+            height: 80,
         }
     }
 
@@ -50,43 +54,74 @@ impl CartridgeBeacon {
         let icon_y = self.y + 10;
 
         match self.id {
+            BeaconId::KinetixPC => {
+                // KinetixPC Drive & Folder Icon: Amber/Cyan storage chassis
+                prism.fill_rect(icon_x, icon_y + 4, 30, 24, 0x001E_293B);
+                prism.draw_rect_outline(icon_x, icon_y + 4, 30, 24, 0x00FA_CC15);
+                prism.fill_rect(icon_x, icon_y, 14, 6, 0x00FA_CC15); // Folder tab
+                prism.fill_rect(icon_x + 4, icon_y + 11, 22, 4, 0x0038_BDF8); // Drive bay 1
+                prism.fill_rect(icon_x + 4, icon_y + 18, 22, 4, 0x004A_DE80); // Drive bay 2
+            }
+            BeaconId::Terminal => {
+                // Kinetix Terminal Icon: Slate box with green prompt >_
+                prism.fill_rect(icon_x, icon_y + 2, 30, 26, 0x0008_0E18);
+                prism.draw_rect_outline(icon_x, icon_y + 2, 30, 26, 0x0038_BDF8);
+                prism.fill_rect(icon_x + 2, icon_y + 2, 26, 5, 0x001E_3A5F); // Window header
+                // Prompt >_
+                prism.put_pixel(icon_x + 6, icon_y + 14, 0x004A_DE80);
+                prism.put_pixel(icon_x + 8, icon_y + 15, 0x004A_DE80);
+                prism.put_pixel(icon_x + 6, icon_y + 16, 0x004A_DE80);
+                prism.fill_rect(icon_x + 12, icon_y + 17, 6, 2, 0x004A_DE80);
+            }
             BeaconId::Scribe => {
                 // Scribe Document Icon: Clean document page with lines
                 prism.fill_rect(icon_x, icon_y, 24, 30, 0x00F8_FAFC); // White paper
                 prism.fill_rect(icon_x + 16, icon_y, 8, 8, 0x0094_A3B8); // Folded corner
-                // Text lines on paper
                 prism.fill_rect(icon_x + 4, icon_y + 12, 14, 2, 0x0002_84C7);
                 prism.fill_rect(icon_x + 4, icon_y + 17, 16, 2, 0x0002_84C7);
                 prism.fill_rect(icon_x + 4, icon_y + 22, 10, 2, 0x0002_84C7);
-                // Golden quill nib on the side
                 prism.fill_rect(icon_x + 24, icon_y + 18, 6, 12, 0x00FA_CC15);
-            }
-            BeaconId::Ouroboros => {
-                // Ouroboros Arcade Snake Icon: Emerald serpentine loop
-                prism.fill_rect(icon_x, icon_y, 30, 30, 0x000F_2A1D); // Dark forest plate
-                prism.draw_rect_outline(icon_x, icon_y, 30, 30, 0x0022_C55E);
-                // Snake segments
-                prism.fill_rect(icon_x + 4, icon_y + 6, 18, 4, 0x004A_DE80);
-                prism.fill_rect(icon_x + 18, icon_y + 6, 4, 14, 0x004A_DE80);
-                prism.fill_rect(icon_x + 8, icon_y + 16, 14, 4, 0x004A_DE80);
-                prism.fill_rect(icon_x + 8, icon_y + 10, 4, 8, 0x004A_DE80);
-                // Food red dot
-                prism.fill_rect(icon_x + 18, icon_y + 24, 4, 4, 0x00F8_7171);
             }
             BeaconId::Telemetry => {
                 // Telemetry CPU / Monitor Icon: Cyan pulse plate
-                prism.fill_rect(icon_x, icon_y, 30, 26, 0x000C_2038); // Deep blue plate
+                prism.fill_rect(icon_x, icon_y, 30, 26, 0x000C_2038);
                 prism.draw_rect_outline(icon_x, icon_y, 30, 26, 0x0038_BDF8);
-                // Pulse waveform
                 prism.put_pixel(icon_x + 4, icon_y + 13, 0x0038_BDF8);
                 prism.put_pixel(icon_x + 8, icon_y + 13, 0x0038_BDF8);
                 prism.put_pixel(icon_x + 12, icon_y + 7, 0x0038_BDF8);
                 prism.put_pixel(icon_x + 16, icon_y + 19, 0x0038_BDF8);
                 prism.put_pixel(icon_x + 20, icon_y + 13, 0x0038_BDF8);
                 prism.put_pixel(icon_x + 24, icon_y + 13, 0x0038_BDF8);
-                // Monitor stand
                 prism.fill_rect(icon_x + 12, icon_y + 26, 6, 4, 0x0064_748B);
                 prism.fill_rect(icon_x + 8, icon_y + 29, 14, 2, 0x0064_748B);
+            }
+            BeaconId::SpeedTest => {
+                // Speed Test Speedometer Icon
+                prism.fill_rect(icon_x, icon_y + 2, 30, 26, 0x0008_1626);
+                prism.draw_rect_outline(icon_x, icon_y + 2, 30, 26, 0x0022_C55E);
+                // Gauge arc ticks
+                prism.fill_rect(icon_x + 4, icon_y + 8, 4, 4, 0x0038_BDF8);
+                prism.fill_rect(icon_x + 13, icon_y + 5, 4, 4, 0x0022_C55E);
+                prism.fill_rect(icon_x + 22, icon_y + 8, 4, 4, 0x00FA_CC15);
+                // Needle
+                prism.fill_rect(icon_x + 14, icon_y + 12, 3, 10, 0x00F8_7171);
+            }
+            BeaconId::Ouroboros => {
+                // Ouroboros Arcade Snake Icon: Emerald serpentine loop
+                prism.fill_rect(icon_x, icon_y, 30, 30, 0x000F_2A1D);
+                prism.draw_rect_outline(icon_x, icon_y, 30, 30, 0x0022_C55E);
+                prism.fill_rect(icon_x + 4, icon_y + 6, 18, 4, 0x004A_DE80);
+                prism.fill_rect(icon_x + 18, icon_y + 6, 4, 14, 0x004A_DE80);
+                prism.fill_rect(icon_x + 8, icon_y + 16, 14, 4, 0x004A_DE80);
+                prism.fill_rect(icon_x + 8, icon_y + 10, 4, 8, 0x004A_DE80);
+                prism.fill_rect(icon_x + 18, icon_y + 24, 4, 4, 0x00F8_7171);
+            }
+            BeaconId::Vault => {
+                // Kinetix Vault Icon
+                prism.fill_rect(icon_x, icon_y + 2, 30, 26, 0x0013_1C38);
+                prism.draw_rect_outline(icon_x, icon_y + 2, 30, 26, 0x0038_BDF8);
+                prism.fill_rect(icon_x + 4, icon_y + 8, 22, 6, 0x00C0_84FC);
+                prism.fill_rect(icon_x + 11, icon_y + 16, 8, 8, 0x0038_BDF8);
             }
         }
 
@@ -105,7 +140,7 @@ impl CartridgeBeacon {
 }
 
 pub struct BeaconManager {
-    pub beacons: [CartridgeBeacon; 3],
+    pub beacons: [CartridgeBeacon; 6],
     pub active_hover: Option<BeaconId>,
 }
 
@@ -113,15 +148,17 @@ impl BeaconManager {
     pub const fn new() -> Self {
         Self {
             beacons: [
-                CartridgeBeacon::new(BeaconId::Scribe, "Scribe", 32, 40),
-                CartridgeBeacon::new(BeaconId::Ouroboros, "Ouroboros", 32, 144),
-                CartridgeBeacon::new(BeaconId::Telemetry, "Telemetry", 32, 248),
+                CartridgeBeacon::new(BeaconId::KinetixPC,  "KinetixPC",  28, 30),
+                CartridgeBeacon::new(BeaconId::Terminal,   "Terminal",   28, 120),
+                CartridgeBeacon::new(BeaconId::Scribe,     "Scribe",     28, 210),
+                CartridgeBeacon::new(BeaconId::Telemetry,  "Telemetry",  28, 300),
+                CartridgeBeacon::new(BeaconId::SpeedTest,  "SpeedTest",  28, 390),
+                CartridgeBeacon::new(BeaconId::Ouroboros,  "Ouroboros",  28, 480),
             ],
             active_hover: None,
         }
     }
 
-    /// Renders all desktop beacons, evaluating pointer coordinates for hover states.
     pub fn render(&mut self, prism: &mut PrismSurface, pointer_x: usize, pointer_y: usize) {
         self.active_hover = None;
 
@@ -134,7 +171,6 @@ impl BeaconManager {
         }
     }
 
-    /// Returns the beacon clicked if pointer is inside one.
     pub fn hit_test(&self, pointer_x: usize, pointer_y: usize) -> Option<BeaconId> {
         for beacon in self.beacons.iter() {
             if beacon.contains(pointer_x, pointer_y) {

@@ -64,6 +64,11 @@ pub struct Task {
     pub context_switches: u64,
     pub voluntary_yields: u64,
     pub preemptions: u64,
+
+    // Research Writeup (25BTRCL255): Processor-Cache Affinity & Core Pinning
+    pub affinity_mask: u64,
+    pub last_core: u8,
+    pub cache_affinity_hits: u64,
 }
 
 impl Task {
@@ -98,7 +103,19 @@ impl Task {
             context_switches: 0,
             voluntary_yields: 0,
             preemptions: 0,
+            affinity_mask: u64::MAX, // All logical cores allowed by default
+            last_core: 0,
+            cache_affinity_hits: 0,
         }
+    }
+
+    /// Returns true if this task's processor affinity bitmask permits execution on `core_id`.
+    #[inline]
+    pub fn is_allowed_on_core(&self, core_id: u8) -> bool {
+        if core_id >= 64 {
+            return true;
+        }
+        (self.affinity_mask & (1u64 << core_id)) != 0
     }
 
     /// Wraps the current boot thread into Task 0 ("Kernel Main").
@@ -119,6 +136,9 @@ impl Task {
             context_switches: 0,
             voluntary_yields: 0,
             preemptions: 0,
+            affinity_mask: u64::MAX,
+            last_core: 0,
+            cache_affinity_hits: 0,
         }
     }
 }

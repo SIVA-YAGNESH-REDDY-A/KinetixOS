@@ -272,42 +272,49 @@ pub fn run_pointer_tests() {
     println!("           KINETIX OS KINETIC POINTER & RETICLE VERIFICATION (PHASE 18)         ");
     println!("================================================================================");
 
+    let (screen_w, screen_h) = {
+        let p = POINTER.lock();
+        (p.screen_width, p.screen_height)
+    };
+    let center_x = (screen_w / 2) as i32;
+    let center_y = (screen_h / 2) as i32;
+
     let initial_state = POINTER.lock().state();
-    println!("  [TEST 1] Initial Pointer Coordinates: ({}, {})", initial_state.x, initial_state.y);
-    assert_eq!(initial_state.x, 512, "Pointer should initially be centered horizontally");
-    assert_eq!(initial_state.y, 384, "Pointer should initially be centered vertically");
-    println!("  [PASS] Pointer initialized and centered at (512, 384).");
+    println!("  [TEST 1] Initial Pointer Coordinates: ({}, {}) [Display: {}x{}]", initial_state.x, initial_state.y, screen_w, screen_h);
+    assert_eq!(initial_state.x, center_x, "Pointer should initially be centered horizontally");
+    assert_eq!(initial_state.y, center_y, "Pointer should initially be centered vertically");
+    println!("  [PASS] Pointer initialized and centered at ({}, {}).", center_x, center_y);
 
     println!("  [TEST 2] Testing synthetic pulse vector: +75 horizontal, -50 vertical, Left Click...");
     POINTER.lock().apply_motion(75, -50, true, false, false);
     let state2 = POINTER.lock().state();
-    assert_eq!(state2.x, 587, "X coordinate should be 512 + 75 = 587");
-    assert_eq!(state2.y, 334, "Y coordinate should be 384 - 50 = 334");
+    assert_eq!(state2.x, center_x + 75, "X coordinate should be center + 75");
+    assert_eq!(state2.y, center_y - 50, "Y coordinate should be center - 50");
     assert!(state2.left_pressed, "Left button should be pressed");
     println!("  [PASS] Pulse vector updated coordinates to ({}, {}) with Left Click confirmed.", state2.x, state2.y);
 
     println!("  [TEST 3] Testing display boundary clamping (negative overflow)...");
-    POINTER.lock().apply_motion(-1000, -1000, false, false, false);
+    POINTER.lock().apply_motion(-5000, -5000, false, false, false);
     let state3 = POINTER.lock().state();
     assert_eq!(state3.x, 0, "X should clamp to 0 at left boundary");
     assert_eq!(state3.y, 0, "Y should clamp to 0 at top boundary");
     println!("  [PASS] Boundary clamping confirmed at (0, 0).");
 
     println!("  [TEST 4] Testing display boundary clamping (positive overflow)...");
-    POINTER.lock().apply_motion(2000, 2000, false, true, false);
+    POINTER.lock().apply_motion(10000, 10000, false, true, false);
     let state4 = POINTER.lock().state();
-    let max_x = (1024 - RETICLE_WIDTH) as i32;
-    let max_y = (768 - RETICLE_HEIGHT) as i32;
+    let max_x = (screen_w.saturating_sub(RETICLE_WIDTH)) as i32;
+    let max_y = (screen_h.saturating_sub(RETICLE_HEIGHT)) as i32;
     assert_eq!(state4.x, max_x, "X should clamp to max display boundary");
     assert_eq!(state4.y, max_y, "Y should clamp to max display boundary");
     assert!(state4.right_pressed, "Right button should be pressed");
     println!("  [PASS] Boundary clamping confirmed at ({}, {}) with Right Click confirmed.", state4.x, state4.y);
 
-    println!("  [TEST 5] Restoring pointer to center (512, 384)...");
-    POINTER.lock().apply_motion(512 - max_x, 384 - max_y, false, false, false);
+    println!("  [TEST 5] Restoring pointer to center ({}, {})...", center_x, center_y);
+    POINTER.lock().apply_motion(center_x - max_x, center_y - max_y, false, false, false);
     let center_state = POINTER.lock().state();
-    assert_eq!(center_state.x, 512);
-    assert_eq!(center_state.y, 384);
+    assert_eq!(center_state.x, center_x);
+    assert_eq!(center_state.y, center_y);
     println!("  [PASS] Reticle restored to center. Zero-flicker background restoration verified.");
 
     println!("\n[TEST] All Kinetic Pointer & Reticle Verification Tests PASSED!\n");

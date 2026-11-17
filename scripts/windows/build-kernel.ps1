@@ -1,4 +1,4 @@
-# Kinetix OS — Kernel Build Script
+﻿# Kinetix OS — Kernel Build Script
 $ErrorActionPreference = "Stop"
 
 $env:RUSTUP_HOME = "D:\Rust\rustup"

@@ -5,7 +5,7 @@
 
 use alloc::vec::Vec;
 use crate::console::font::{self, FONT_WIDTH, FONT_HEIGHT};
-use kinetix_boot_protocol::{FramebufferInfo, PixelFormat};
+use kinetix_boot_protocol::FramebufferInfo;
 use spin::Mutex;
 
 pub struct PrismSurface {
@@ -39,7 +39,7 @@ impl PrismSurface {
         self.width = width;
         self.height = height;
         self.stride = stride;
-        self.is_bgr = fb.pixel_format == PixelFormat::Bgr;
+        self.is_bgr = false; // Modern UEFI 32-bit GOP linear framebuffers are 0x00RRGGBB
         self.fb_target = Some(fb);
 
         // Allocate 1024x768 u32 words (~3 MiB) in the kernel heap

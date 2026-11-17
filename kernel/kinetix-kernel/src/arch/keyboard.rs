@@ -110,7 +110,7 @@ impl KeyboardState {
         let use_upper = if self.caps_lock { !shift } else { shift };
 
         match code {
-            0x01 => None, // Escape
+            0x01 => Some('\x1B'), // Escape
             0x02 => Some(if shift { '!' } else { '1' }),
             0x03 => Some(if shift { '@' } else { '2' }),
             0x04 => Some(if shift { '#' } else { '3' }),
@@ -162,6 +162,10 @@ impl KeyboardState {
             0x34 => Some(if shift { '>' } else { '.' }),
             0x35 => Some(if shift { '?' } else { '/' }),
             0x39 => Some(' '), // Spacebar
+            0x48 => Some('\x11'), // Up Arrow
+            0x50 => Some('\x12'), // Down Arrow
+            0x4B => Some('\x13'), // Left Arrow
+            0x4D => Some('\x14'), // Right Arrow
             _ => None,
         }
     }

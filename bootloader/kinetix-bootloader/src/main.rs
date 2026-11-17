@@ -228,10 +228,36 @@ fn main() -> Status {
         }
     }
 
-    // 7. Initialize Graphics Output Protocol (GOP)
+    // 7. Initialize Graphics Output Protocol (GOP) - Select Native / 1080p Resolution
     let gop_handle = boot::get_handle_for_protocol::<GraphicsOutput>().ok();
     if let Some(handle) = gop_handle {
         if let Ok(mut gop) = boot::open_protocol_exclusive::<GraphicsOutput>(handle) {
+            let mut best_mode = None;
+            let mut best_pixels = 0usize;
+
+            for mode in gop.modes() {
+                let info = mode.info();
+                let fmt = info.pixel_format();
+                if fmt != UefiPixelFormat::Rgb && fmt != UefiPixelFormat::Bgr {
+                    continue;
+                }
+                let (w, h) = info.resolution();
+                if w <= 1920 && h <= 1080 {
+                    let pixels = w * h;
+                    if (w == 1920 && h == 1080) || pixels > best_pixels {
+                        best_pixels = pixels;
+                        best_mode = Some(mode);
+                        if w == 1920 && h == 1080 {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if let Some(mode) = best_mode {
+                let _ = gop.set_mode(&mode);
+            }
+
             let mode_info = gop.current_mode_info();
             let mut fb = gop.frame_buffer();
             let fb_ptr = fb.as_mut_ptr() as u64;

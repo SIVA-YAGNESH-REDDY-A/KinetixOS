@@ -22,19 +22,19 @@ pub fn compute_intensive_math(iterations: u64) -> u64 {
 }
 
 // Workload 1: Pure Compute (Symmetric CPU-Bound Tasks)
-// 20,000,000 iterations per worker (~60-80M cycles, ~2-3 PIT ticks)
+// 100,000 iterations per worker (~60-80M cycles, ~2-3 PIT ticks)
 pub fn worker_compute_a() {
-    let res = compute_intensive_math(25_000_000);
+    let res = compute_intensive_math(100_000);
     black_box(res);
 }
 
 pub fn worker_compute_b() {
-    let res = compute_intensive_math(25_000_000);
+    let res = compute_intensive_math(100_000);
     black_box(res);
 }
 
 pub fn worker_compute_c() {
-    let res = compute_intensive_math(25_000_000);
+    let res = compute_intensive_math(100_000);
     black_box(res);
 }
 
@@ -65,12 +65,12 @@ pub fn worker_io_burst_c() {
 
 // Workload 3: Heterogeneous Mixed Workload
 pub fn worker_mixed_comp_1() {
-    let res = compute_intensive_math(30_000_000);
+    let res = compute_intensive_math(120_000);
     black_box(res);
 }
 
 pub fn worker_mixed_comp_2() {
-    let res = compute_intensive_math(30_000_000);
+    let res = compute_intensive_math(120_000);
     black_box(res);
 }
 

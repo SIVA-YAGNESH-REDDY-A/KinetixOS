@@ -17,8 +17,6 @@ const GRID_COLS: usize = 20;
 const GRID_ROWS: usize = 20;
 const CELL_SIZE: usize = 19;
 const CELL_PAD: usize = 1;
-const GRID_ORIGIN_X: usize = OUROBOROS_X + 12;
-const GRID_ORIGIN_Y: usize = OUROBOROS_Y + 36;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,20 +193,23 @@ impl OuroborosArena {
         // 1. Draw window frame, header, and close button
         self.chamber.render(prism);
 
+        let grid_origin_x = self.chamber.x + 12;
+        let grid_origin_y = self.chamber.y + 36;
+
         // 2. Draw Playing Grid Background (400x400)
-        prism.fill_rect(GRID_ORIGIN_X, GRID_ORIGIN_Y, 400, 400, 0x0006_140D);
-        prism.draw_rect_outline(GRID_ORIGIN_X, GRID_ORIGIN_Y, 400, 400, 0x0022_C55E);
+        prism.fill_rect(grid_origin_x, grid_origin_y, 400, 400, 0x0006_140D);
+        prism.draw_rect_outline(grid_origin_x, grid_origin_y, 400, 400, 0x0022_C55E);
 
         // 3. Draw Food (Ruby red orb with highlight)
-        let food_px = GRID_ORIGIN_X + (self.food.x as usize) * (CELL_SIZE + CELL_PAD);
-        let food_py = GRID_ORIGIN_Y + (self.food.y as usize) * (CELL_SIZE + CELL_PAD);
+        let food_px = grid_origin_x + (self.food.x as usize) * (CELL_SIZE + CELL_PAD);
+        let food_py = grid_origin_y + (self.food.y as usize) * (CELL_SIZE + CELL_PAD);
         prism.fill_rect(food_px + 2, food_py + 2, CELL_SIZE - 4, CELL_SIZE - 4, 0x00EF_4444);
         prism.put_pixel(food_px + 4, food_py + 4, 0x00FF_FFFF); // Glimmer
 
         // 4. Draw Snake Body
         for (idx, &seg) in self.body.iter().enumerate() {
-            let seg_px = GRID_ORIGIN_X + (seg.x as usize) * (CELL_SIZE + CELL_PAD);
-            let seg_py = GRID_ORIGIN_Y + (seg.y as usize) * (CELL_SIZE + CELL_PAD);
+            let seg_px = grid_origin_x + (seg.x as usize) * (CELL_SIZE + CELL_PAD);
+            let seg_py = grid_origin_y + (seg.y as usize) * (CELL_SIZE + CELL_PAD);
 
             if idx == 0 {
                 // Head: Lime green with eyes
@@ -226,10 +227,10 @@ impl OuroborosArena {
         // 5. Draw Game Over Overlay if crashed
         if self.state == GameState::GameOver {
             // Translucent dark plate across center grid
-            prism.fill_rect(GRID_ORIGIN_X + 40, GRID_ORIGIN_Y + 140, 320, 100, 0x000A_1124);
-            prism.draw_rect_outline(GRID_ORIGIN_X + 40, GRID_ORIGIN_Y + 140, 320, 100, 0x00EF_4444);
-            prism.draw_text(GRID_ORIGIN_X + 110, GRID_ORIGIN_Y + 165, "GAME OVER!", 0x00EF_4444, None);
-            prism.draw_text(GRID_ORIGIN_X + 60, GRID_ORIGIN_Y + 195, "Press SPACE to Restart", 0x00FA_CC15, None);
+            prism.fill_rect(grid_origin_x + 40, grid_origin_y + 140, 320, 100, 0x000A_1124);
+            prism.draw_rect_outline(grid_origin_x + 40, grid_origin_y + 140, 320, 100, 0x00EF_4444);
+            prism.draw_text(grid_origin_x + 110, grid_origin_y + 165, "GAME OVER!", 0x00EF_4444, None);
+            prism.draw_text(grid_origin_x + 60, grid_origin_y + 195, "Press SPACE to Restart", 0x00FA_CC15, None);
         }
 
         // 6. Draw Bottom Status Bar inside window
@@ -341,6 +342,8 @@ pub fn run_ouroboros_tests() {
     assert_eq!(arena.state, GameState::Running);
     assert_eq!(arena.body.len(), 3);
     assert_eq!(arena.score, 0);
+    // Close window after tests so the desktop boots clean and only opens on icon click
+    arena.close();
     crate::println!("  [PASS] Game reset verified: state restored to Running with clean score.");
 
     crate::println!("\n[TEST] All Ouroboros (Cartridge II) Verification Tests PASSED!\n");
